@@ -12,7 +12,7 @@ import {
 import {
   generateText,
   generateImageUrl,
-  generateVideoUrl,
+  generateVideoFromImages,
 } from '../services/pollinations';
 
 // ============ PROMPT ENGINE ============
@@ -368,48 +368,47 @@ export async function generateProject(
   }
   updateStep('images', 'completed', 100);
 
-  // Step 7: Generate Videos (REAL AI - Hugging Face)
+  // Step 7: Generate Videos (Client-Side using Canvas + MediaRecorder)
   updateStep('video', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Video' } });
 
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i];
-    
-    if (scene.status === 'failed') {
-      continue; // Skip failed scenes
-    }
-
+  // Collect all successful scene images
+  const successfulScenes = scenes.filter(s => s.status === 'completed' && s.generatedImage);
+  
+  if (successfulScenes.length > 0) {
     try {
-      // Generate video from Hugging Face
-      const videoUrl = generateVideoUrl(scene.videoPrompt, {
-        duration: Math.min(scene.duration, 5),
+      // Generate a single video from all scene images
+      const imageUrls = successfulScenes.map(s => s.generatedImage!);
+      
+      const videoUrl = await generateVideoFromImages(imageUrls, {
+        durationPerImage: 3, // 3 seconds per scene
+        transitionDuration: 0.5, // 0.5 second transitions
+        width: aspectRatio === '9:16' ? 576 : aspectRatio === '1:1' ? 768 : 1024,
+        height: aspectRatio === '9:16' ? 1024 : aspectRatio === '1:1' ? 768 : 576,
+        onProgress: (progress) => {
+          updateStep('video', 'active', progress);
+        },
       });
 
-      // Fetch the video and convert to blob URL
-      const response = await fetch(videoUrl);
-      if (!response.ok) {
-        throw new Error(`Video generation failed: ${response.status}`);
-      }
+      // Add the video to the first scene (or create a final video reference)
+      const updatedScenes = scenes.map((scene, i) => {
+        if (i === 0) {
+          return { ...scene, generatedVideo: videoUrl };
+        }
+        return scene;
+      });
       
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      const updatedScene = { ...scene, generatedVideo: blobUrl };
-      scenes[i] = updatedScene;
-
+      scenes = updatedScenes;
       dispatch({
-        type: 'UPDATE_SCENE',
-        payload: { projectId, scene: updatedScene },
+        type: 'UPDATE_PROJECT',
+        payload: { id: projectId, scenes: updatedScenes, finalVideo: videoUrl },
       });
     } catch (error) {
-      console.error(`Video generation failed for scene ${i + 1}:`, error);
-      // Continue with other scenes
+      console.error('Video generation failed:', error);
+      // Continue without video
     }
-
-    const progress = ((i + 1) / scenes.length) * 100;
-    updateStep('video', 'active', progress);
-    await delay(500);
   }
+  
   updateStep('video', 'completed', 100);
 
   // Step 8: Rendering (combining)

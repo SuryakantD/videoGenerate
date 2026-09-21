@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
@@ -598,6 +598,11 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
   const [elapsed, setElapsed] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Check if we have a combined video or individual scene videos
+  const hasCombinedVideo = project.finalVideo;
+  const hasSceneVideos = project.scenes?.some((s: Scene) => s.generatedVideo);
 
   useEffect(() => {
     if (!playing || !project.scenes?.length) return;
@@ -637,22 +642,19 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
     setExportMessage('Preparing downloads...');
     
     try {
+      // Download combined video if exists
+      if (hasCombinedVideo) {
+        setExportMessage('Downloading complete video...');
+        await downloadVideo(project.finalVideo, `${project.title}-full-video.webm`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      
       // Download all scene images
       for (let i = 0; i < project.scenes.length; i++) {
         const scene = project.scenes[i];
         if (scene.generatedImage) {
           setExportMessage(`Downloading scene ${i + 1} image...`);
           await downloadImage(scene.generatedImage, `${project.title}-scene-${i + 1}.png`);
-          await new Promise(r => setTimeout(r, 500)); // Small delay between downloads
-        }
-      }
-      
-      // Download all scene videos
-      for (let i = 0; i < project.scenes.length; i++) {
-        const scene = project.scenes[i];
-        if (scene.generatedVideo) {
-          setExportMessage(`Downloading scene ${i + 1} video...`);
-          await downloadVideo(scene.generatedVideo, `${project.title}-scene-${i + 1}.mp4`);
           await new Promise(r => setTimeout(r, 500));
         }
       }
@@ -680,14 +682,12 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
     }
   };
 
-  const handleExportCurrentVideo = async () => {
-    const scene = project.scenes?.[currentSceneIndex];
-    if (scene?.generatedVideo) {
+  const handleExportVideo = async () => {
+    if (hasCombinedVideo) {
       try {
-        await downloadVideo(scene.generatedVideo, `${project.title}-scene-${currentSceneIndex + 1}.mp4`);
+        await downloadVideo(project.finalVideo, `${project.title}-video.webm`);
       } catch (error) {
-        // Fallback: open in new tab
-        window.open(scene.generatedVideo, '_blank');
+        window.open(project.finalVideo, '_blank');
       }
     }
   };
@@ -701,18 +701,26 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
         <div className="relative bg-black flex items-center justify-center" style={{ aspectRatio: project.aspectRatio === '9:16' ? '9/16' : project.aspectRatio === '1:1' ? '1/1' : '16/9', maxHeight: '500px', margin: '0 auto' }}>
           {isCompleted && project.scenes?.length > 0 ? (
             <>
-              {/* Real video or image fallback */}
+              {/* Video player - uses combined video or image slideshow */}
               <div className="relative w-full h-full overflow-hidden">
-                {playing && currentScene?.generatedVideo ? (
+                {hasCombinedVideo ? (
+                  // Play the combined video
                   <video
-                    key={currentSceneIndex}
-                    src={currentScene.generatedVideo}
+                    ref={videoRef}
+                    src={project.finalVideo}
                     className="w-full h-full object-cover"
-                    autoPlay
+                    autoPlay={playing}
                     muted
                     playsInline
+                    onPlay={() => setPlaying(true)}
+                    onPause={() => setPlaying(false)}
+                    onEnded={() => {
+                      setPlaying(false);
+                      setElapsed(0);
+                    }}
                   />
                 ) : currentScene?.generatedImage ? (
+                  // Fallback to image slideshow
                   <img
                     src={currentScene.generatedImage}
                     alt={`Scene ${currentSceneIndex + 1}`}
@@ -722,7 +730,6 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                       transition: 'transform 8s ease-in-out',
                     }}
                     onError={(e) => {
-                      // If image fails to load, show placeholder
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
@@ -733,13 +740,13 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                 )}
                 
                 {/* Scene info overlay */}
-                {playing && (
+                {playing && currentScene && (
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                     <p className="text-white text-sm font-medium">
-                      Scene {currentSceneIndex + 1}: {currentScene?.description}
+                      Scene {currentSceneIndex + 1}: {currentScene.description}
                     </p>
                     <p className="text-gray-300 text-xs mt-1">
-                      {currentScene?.cameraMovement} • {currentScene?.lighting}
+                      {currentScene.cameraMovement} • {currentScene.lighting}
                     </p>
                   </div>
                 )}
@@ -834,7 +841,7 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
         <div className="space-y-4">
           {/* Scene-specific exports */}
           <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-4">
-            <h4 className="text-white font-semibold text-sm mb-3">Export Current Scene ({currentSceneIndex + 1})</h4>
+            <h4 className="text-white font-semibold text-sm mb-3">Export Options</h4>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={handleExportCurrentImage}
@@ -842,15 +849,15 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                 className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download size={14} />
-                Export Image
+                Export Scene Image
               </button>
               <button
-                onClick={handleExportCurrentVideo}
-                disabled={!currentScene?.generatedVideo}
+                onClick={handleExportVideo}
+                disabled={!hasCombinedVideo}
                 className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download size={14} />
-                Export Video
+                Export Full Video
               </button>
             </div>
           </div>
