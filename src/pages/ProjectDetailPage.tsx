@@ -598,11 +598,23 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
   const [elapsed, setElapsed] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
+  const [videoError, setVideoError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Check if we have a combined video or individual scene videos
   const hasCombinedVideo = project.finalVideo;
   const hasSceneVideos = project.scenes?.some((s: Scene) => s.generatedVideo);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[FinalVideoTab] Project:', {
+      hasCombinedVideo,
+      hasSceneVideos,
+      finalVideo: project.finalVideo?.substring(0, 50) + '...',
+      scenesCount: project.scenes?.length,
+      status: project.status,
+    });
+  }, [project, hasCombinedVideo, hasSceneVideos]);
 
   useEffect(() => {
     if (!playing || !project.scenes?.length) return;
@@ -718,7 +730,24 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                       setPlaying(false);
                       setElapsed(0);
                     }}
+                    onError={(e) => {
+                      console.error('[VideoPlayer] Video error:', e);
+                      setVideoError('Video failed to load. Showing slideshow instead.');
+                    }}
                   />
+                ) : videoError ? (
+                  // Show error message and fallback to slideshow
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 p-4">
+                    <Film size={48} className="text-yellow-500 mb-3" />
+                    <p className="text-yellow-400 text-sm text-center mb-2">{videoError}</p>
+                    {currentScene?.generatedImage && (
+                      <img
+                        src={currentScene.generatedImage}
+                        alt={`Scene ${currentSceneIndex + 1}`}
+                        className="max-w-full max-h-[60%] object-contain rounded-lg"
+                      />
+                    )}
+                  </div>
                 ) : currentScene?.generatedImage ? (
                   // Fallback to image slideshow
                   <img
@@ -730,6 +759,7 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                       transition: 'transform 8s ease-in-out',
                     }}
                     onError={(e) => {
+                      console.error('[ImagePlayer] Image error:', e);
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
@@ -752,7 +782,7 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                 )}
                 
                 {/* Play overlay */}
-                {!playing && elapsed === 0 && (
+                {!playing && elapsed === 0 && !videoError && (
                   <button
                     onClick={handlePlay}
                     className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/30 transition-colors"
@@ -792,6 +822,20 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
               <span className="text-xs text-gray-500">{elapsed.toFixed(1)}s</span>
               <span className="text-xs text-gray-500">{project.duration}s</span>
             </div>
+            
+            {/* Debug info */}
+            {hasCombinedVideo && (
+              <div className="mt-2 p-2 bg-gray-900/50 rounded text-xs">
+                <p className="text-green-400">✓ Video generated successfully</p>
+                <p className="text-gray-500 mt-1">Format: WebM | Duration: {project.duration}s</p>
+              </div>
+            )}
+            {!hasCombinedVideo && !videoError && (
+              <div className="mt-2 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded text-xs">
+                <p className="text-yellow-400">⚠ Video generation skipped or failed</p>
+                <p className="text-gray-500 mt-1">Showing scene images as slideshow</p>
+              </div>
+            )}
           </div>
         )}
 

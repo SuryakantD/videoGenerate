@@ -94,93 +94,120 @@ export async function generateVideoFromImages(
     onProgress,
   } = options;
 
-  return new Promise((resolve, reject) => {
-    // Create canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      reject(new Error('Could not create canvas context'));
-      return;
-    }
+  console.log('[VideoGen] Starting video generation with', imageUrls.length, 'images');
 
-    // Setup MediaRecorder
-    const stream = canvas.captureStream(30); // 30 FPS
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 5000000, // 5 Mbps
-    });
-
-    const chunks: Blob[] = [];
-    
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunks.push(e.data);
-      }
-    };
-
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const videoUrl = URL.createObjectURL(blob);
-      stream.getTracks().forEach(track => track.stop());
-      resolve(videoUrl);
-    };
-
-    mediaRecorder.onerror = (e) => {
-      reject(new Error('MediaRecorder error'));
-    };
-
-    // Load images
-    const images: HTMLImageElement[] = [];
-    let loadedCount = 0;
-
-    const loadNextImage = (index: number) => {
-      if (index >= imageUrls.length) {
-        // All images loaded, start recording
-        startRecording();
-        return;
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Could not create canvas context');
       }
 
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        images[index] = img;
-        loadedCount++;
-        if (onProgress) {
-          onProgress((loadedCount / imageUrls.length) * 50); // 0-50% for loading
+      // Setup MediaRecorder
+      const stream = canvas.captureStream(30); // 30 FPS
+      
+      // Try different MIME types for better browser compatibility
+      let mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm;codecs=vp8';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/webm';
         }
-        loadNextImage(index + 1);
-      };
-      img.onerror = () => {
-        console.error(`Failed to load image ${index}`);
-        // Create a placeholder
-        const placeholder = document.createElement('canvas');
-        placeholder.width = width;
-        placeholder.height = height;
-        const pCtx = placeholder.getContext('2d');
-        if (pCtx) {
-          pCtx.fillStyle = '#1a1a1a';
-          pCtx.fillRect(0, 0, width, height);
-          pCtx.fillStyle = '#ffffff';
-          pCtx.font = '20px Arial';
-          pCtx.textAlign = 'center';
-          pCtx.fillText(`Scene ${index + 1}`, width / 2, height / 2);
-        }
-        const placeholderImg = new Image();
-        placeholderImg.src = placeholder.toDataURL();
-        images[index] = placeholderImg;
-        loadedCount++;
-        loadNextImage(index + 1);
-      };
-      img.src = imageUrls[index];
-    };
+      }
+      
+      console.log('[VideoGen] Using MIME type:', mimeType);
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 2500000, // 2.5 Mbps for better compatibility
+      });
 
-    const startRecording = () => {
+      const chunks: Blob[] = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        console.log('[VideoGen] Recording stopped, creating blob...');
+        const blob = new Blob(chunks, { type: mimeType });
+        const videoUrl = URL.createObjectURL(blob);
+        console.log('[VideoGen] Video URL created:', videoUrl.substring(0, 50) + '...');
+        stream.getTracks().forEach(track => track.stop());
+        resolve(videoUrl);
+      };
+
+      mediaRecorder.onerror = (e) => {
+        console.error('[VideoGen] MediaRecorder error:', e);
+        reject(new Error('MediaRecorder error'));
+      };
+
+      // Load images and convert to data URLs to avoid CORS issues
+      console.log('[VideoGen] Loading images...');
+      const dataUrls: string[] = [];
+      
+      for (let i = 0; i < imageUrls.length; i++) {
+        try {
+          console.log(`[VideoGen] Loading image ${i + 1}/${imageUrls.length}`);
+          
+          // Fetch the image and convert to data URL
+          const response = await fetch(imageUrls[i]);
+          const blob = await response.blob();
+          const dataUrl = await new Promise<string>((resolveUrl) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolveUrl(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          
+          dataUrls.push(dataUrl);
+          
+          if (onProgress) {
+            onProgress(((i + 1) / imageUrls.length) * 30); // 0-30% for loading
+          }
+        } catch (error) {
+          console.error(`[VideoGen] Failed to load image ${i}:`, error);
+          // Create a placeholder data URL
+          const placeholder = document.createElement('canvas');
+          placeholder.width = width;
+          placeholder.height = height;
+          const pCtx = placeholder.getContext('2d');
+          if (pCtx) {
+            pCtx.fillStyle = '#1a1a1a';
+            pCtx.fillRect(0, 0, width, height);
+            pCtx.fillStyle = '#ffffff';
+            pCtx.font = '30px Arial';
+            pCtx.textAlign = 'center';
+            pCtx.fillText(`Scene ${i + 1}`, width / 2, height / 2);
+          }
+          dataUrls.push(placeholder.toDataURL());
+        }
+      }
+
+      console.log('[VideoGen] All images loaded, starting recording...');
+
+      // Load images into HTMLImageElements
+      const images: HTMLImageElement[] = [];
+      for (let i = 0; i < dataUrls.length; i++) {
+        const img = new Image();
+        await new Promise<void>((resolveImg, rejectImg) => {
+          img.onload = () => resolveImg();
+          img.onerror = () => rejectImg(new Error(`Failed to load image ${i}`));
+          img.src = dataUrls[i];
+        });
+        images.push(img);
+      }
+
+      // Start recording
       mediaRecorder.start();
       
-      const totalDuration = imageUrls.length * durationPerImage * 1000;
+      const totalDuration = images.length * durationPerImage * 1000;
       const startTime = Date.now();
       
       const animate = () => {
@@ -188,13 +215,13 @@ export async function generateVideoFromImages(
         const progress = Math.min(elapsed / totalDuration, 1);
         
         if (onProgress) {
-          onProgress(50 + progress * 50); // 50-100% for recording
+          onProgress(30 + progress * 70); // 30-100% for recording
         }
 
         // Calculate current scene
         const sceneIndex = Math.min(
           Math.floor(elapsed / (durationPerImage * 1000)),
-          imageUrls.length - 1
+          images.length - 1
         );
         
         const sceneProgress = (elapsed % (durationPerImage * 1000)) / (durationPerImage * 1000);
@@ -234,14 +261,16 @@ export async function generateVideoFromImages(
         if (elapsed < totalDuration) {
           requestAnimationFrame(animate);
         } else {
+          console.log('[VideoGen] Animation complete, stopping recorder...');
           mediaRecorder.stop();
         }
       };
 
       animate();
-    };
-
-    loadNextImage(0);
+    } catch (error) {
+      console.error('[VideoGen] Error:', error);
+      reject(error);
+    }
   });
 }
 

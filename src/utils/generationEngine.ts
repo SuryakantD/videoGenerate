@@ -371,14 +371,18 @@ export async function generateProject(
   // Step 7: Generate Videos (Client-Side using Canvas + MediaRecorder)
   updateStep('video', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Video' } });
-
+  
   // Collect all successful scene images
   const successfulScenes = scenes.filter(s => s.status === 'completed' && s.generatedImage);
+  let finalVideoUrl: string | undefined;
+  
+  console.log('[GenerationEngine] Starting video generation with', successfulScenes.length, 'successful scenes');
   
   if (successfulScenes.length > 0) {
     try {
       // Generate a single video from all scene images
       const imageUrls = successfulScenes.map(s => s.generatedImage!);
+      console.log('[GenerationEngine] Image URLs:', imageUrls.map(url => url.substring(0, 50) + '...'));
       
       const videoUrl = await generateVideoFromImages(imageUrls, {
         durationPerImage: 3, // 3 seconds per scene
@@ -389,7 +393,10 @@ export async function generateProject(
           updateStep('video', 'active', progress);
         },
       });
-
+      
+      console.log('[GenerationEngine] Video generated successfully:', videoUrl.substring(0, 50) + '...');
+      finalVideoUrl = videoUrl;
+      
       // Add the video to the first scene (or create a final video reference)
       const updatedScenes = scenes.map((scene, i) => {
         if (i === 0) {
@@ -404,22 +411,26 @@ export async function generateProject(
         payload: { id: projectId, scenes: updatedScenes, finalVideo: videoUrl },
       });
     } catch (error) {
-      console.error('Video generation failed:', error);
-      // Continue without video
+      console.error('[GenerationEngine] Video generation failed:', error);
+      // Continue without video - will show slideshow instead
     }
+  } else {
+    console.warn('[GenerationEngine] No successful scenes to generate video from');
   }
   
   updateStep('video', 'completed', 100);
-
+  
   // Step 8: Rendering (combining)
   updateStep('rendering', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Rendering' } });
   await delay(1500);
   updateStep('rendering', 'completed', 100);
-
+  
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Completed' } });
-  dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, finalVideo: 'ready' } });
-
+  // Don't overwrite finalVideo - keep the actual video URL if it was generated
+  if (!finalVideoUrl) {
+    console.log('[GenerationEngine] No video was generated, project will show slideshow');
+  }
   const project: Project = {
     id: projectId,
     title,
