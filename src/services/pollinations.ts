@@ -149,31 +149,38 @@ export async function generateVideoFromImages(
         reject(new Error('MediaRecorder error'));
       };
 
-      // Load images and convert to data URLs to avoid CORS issues
+      // Load images directly from URLs (no fetch/conversion needed!)
       console.log('[VideoGen] Loading images...');
-      const dataUrls: string[] = [];
+      const images: HTMLImageElement[] = [];
       
       for (let i = 0; i < imageUrls.length; i++) {
         try {
-          console.log(`[VideoGen] Loading image ${i + 1}/${imageUrls.length}`);
+          console.log(`[VideoGen] Loading image ${i + 1}/${imageUrls.length}: ${imageUrls[i].substring(0, 60)}...`);
           
-          // Fetch the image and convert to data URL
-          const response = await fetch(imageUrls[i]);
-          const blob = await response.blob();
-          const dataUrl = await new Promise<string>((resolveUrl) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolveUrl(reader.result as string);
-            reader.readAsDataURL(blob);
+          // Load image directly from URL (Pollinations URLs work directly!)
+          const img = new Image();
+          img.crossOrigin = 'anonymous'; // Enable CORS for canvas
+          
+          await new Promise<void>((resolveImg, rejectImg) => {
+            img.onload = () => {
+              console.log(`[VideoGen] Image ${i + 1} loaded successfully`);
+              resolveImg();
+            };
+            img.onerror = (e) => {
+              console.error(`[VideoGen] Failed to load image ${i + 1}:`, e);
+              rejectImg(new Error(`Failed to load image ${i + 1}`));
+            };
+            img.src = imageUrls[i];
           });
           
-          dataUrls.push(dataUrl);
+          images.push(img);
           
           if (onProgress) {
             onProgress(((i + 1) / imageUrls.length) * 30); // 0-30% for loading
           }
         } catch (error) {
-          console.error(`[VideoGen] Failed to load image ${i}:`, error);
-          // Create a placeholder data URL
+          console.error(`[VideoGen] Failed to load image ${i + 1}:`, error);
+          // Create a placeholder image
           const placeholder = document.createElement('canvas');
           placeholder.width = width;
           placeholder.height = height;
@@ -186,23 +193,13 @@ export async function generateVideoFromImages(
             pCtx.textAlign = 'center';
             pCtx.fillText(`Scene ${i + 1}`, width / 2, height / 2);
           }
-          dataUrls.push(placeholder.toDataURL());
+          const placeholderImg = new Image();
+          placeholderImg.src = placeholder.toDataURL();
+          images.push(placeholderImg);
         }
       }
 
       console.log('[VideoGen] All images loaded, starting recording...');
-
-      // Load images into HTMLImageElements
-      const images: HTMLImageElement[] = [];
-      for (let i = 0; i < dataUrls.length; i++) {
-        const img = new Image();
-        await new Promise<void>((resolveImg, rejectImg) => {
-          img.onload = () => resolveImg();
-          img.onerror = () => rejectImg(new Error(`Failed to load image ${i}`));
-          img.src = dataUrls[i];
-        });
-        images.push(img);
-      }
 
       // Start recording
       mediaRecorder.start();

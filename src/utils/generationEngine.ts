@@ -316,7 +316,7 @@ export async function generateProject(
   });
   updateStep('storyboard', 'completed', 100);
 
-  // Step 6: Generate Images (REAL AI - Hugging Face)
+  // Step 6: Generate Images (REAL AI - Pollinations)
   updateStep('images', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Images' } });
 
@@ -324,35 +324,34 @@ export async function generateProject(
                           aspectRatio === '1:1' ? { width: 768, height: 768 } :
                           { width: 1024, height: 576 };
 
+  console.log('[GenerationEngine] Starting image generation for', scenes.length, 'scenes');
+
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     
+    console.log(`[GenerationEngine] Generating image for Scene ${i + 1}:`, scene.description);
+    
     try {
-      // Generate REAL image from Hugging Face
+      // Generate REAL image URL from Pollinations (no fetch needed - URLs work directly!)
       const imageUrl = generateImageUrl(scene.imagePrompt, {
         ...imageDimensions,
         seed: projectId.charCodeAt(0) * 1000 + i * 100,
       });
 
-      // Fetch the image and convert to blob URL
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        throw new Error(`Image generation failed: ${response.status}`);
-      }
-      
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      console.log(`[GenerationEngine] Scene ${i + 1} image URL:`, imageUrl.substring(0, 80) + '...');
 
-      // Update scene with generated image
-      const updatedScene = { ...scene, generatedImage: blobUrl, status: 'completed' as const };
+      // Update scene with generated image URL (use URL directly, no blob conversion!)
+      const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
       scenes[i] = updatedScene;
 
       dispatch({
         type: 'UPDATE_SCENE',
         payload: { projectId, scene: updatedScene },
       });
+      
+      console.log(`[GenerationEngine] Scene ${i + 1} image generated successfully`);
     } catch (error) {
-      console.error(`Image generation failed for scene ${i + 1}:`, error);
+      console.error(`[GenerationEngine] Image generation failed for scene ${i + 1}:`, error);
       // Mark as failed but continue
       const updatedScene = { ...scene, status: 'failed' as const };
       scenes[i] = updatedScene;
@@ -366,6 +365,10 @@ export async function generateProject(
     updateStep('images', 'active', progress);
     await delay(800); // Small delay between images
   }
+  
+  console.log('[GenerationEngine] Image generation complete. Successful scenes:', 
+    scenes.filter(s => s.status === 'completed').length, '/', scenes.length);
+  
   updateStep('images', 'completed', 100);
 
   // Step 7: Generate Videos (Client-Side using Canvas + MediaRecorder)
