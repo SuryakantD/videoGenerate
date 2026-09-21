@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
@@ -599,7 +599,6 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
   const [videoError, setVideoError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Check if we have a combined video or individual scene videos
   const hasCombinedVideo = project.finalVideo;
@@ -718,7 +717,7 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                 {hasCombinedVideo ? (
                   // Play the combined video
                   <video
-                    ref={videoRef}
+                    key={project.finalVideo}
                     src={project.finalVideo}
                     className="w-full h-full object-cover"
                     autoPlay={playing}
