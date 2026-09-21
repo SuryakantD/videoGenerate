@@ -2,25 +2,25 @@
 
 > **Create stunning AI-generated 15-second videos from text ideas — 100% FREE**
 
-A full end-to-end AI video production pipeline that transforms your text ideas into real AI-generated videos using free APIs.
+A full end-to-end AI video production pipeline that transforms your text ideas into real AI-generated videos using Agnes AI's free API.
 
-![AI Video Studio](https://img.shields.io/badge/AI-Video%20Generator-violet) ![Free](https://img.shields.io/badge/Cost-100%25%20Free-green) ![Pollinations](https://img.shields.io/badge/Powered%20By-Pollinations.ai-blue)
+![AI Video Studio](https://img.shields.io/badge/AI-Video%20Generator-violet) ![Free](https://img.shields.io/badge/Cost-100%25%20Free-green) ![Agnes AI](https://img.shields.io/badge/Powered%20By-Agnes%20AI-blue)
 
 ---
 
 ## ✨ Features
 
 ### 🤖 Real AI Generation (Not Demo!)
-- **Text Generation** — GPT-4o-mini creates your story, characters, and scene plans
-- **Image Generation** — Flux model generates unique AI images for each scene
-- **Video Generation** — WAN 2.6 / Veo animates images into video clips
-- **Text-to-Speech** — Multiple AI voices for voiceover
+- **Text Generation** — Agnes 3.0 Flash creates your story, characters, and scene plans
+- **Image Generation** — Agnes Image 2.5 Flash generates unique AI images for each scene
+- **Video Generation** — Agnes Video 2.5 Flash animates images into video clips
+- **Real-Time Progress** — Watch your video being created step by step
 
 ### 🎯 Complete Pipeline
 ```
 Your Text Idea
     ↓
-AI Story Creation (GPT-4o-mini)
+AI Story Creation (Agnes 3.0 Flash)
     ↓
 Character Design (with consistency engine)
     ↓
@@ -28,9 +28,9 @@ Location Scouting
     ↓
 Storyboard Planning (3-5 scenes)
     ↓
-AI Image Generation (Flux)
+AI Image Generation (Agnes Image 2.5 Flash)
     ↓
-AI Video Generation (WAN 2.6)
+AI Video Generation (Agnes Video 2.5 Flash)
     ↓
 Timeline Assembly
     ↓
@@ -57,6 +57,7 @@ Final 15-Second Video
 ### Prerequisites
 - Node.js 18+ installed
 - A modern web browser
+- **FREE Agnes AI API key** from [platform.agnes-ai.com](https://platform.agnes-ai.com)
 
 ### Installation
 
@@ -75,40 +76,36 @@ npm run dev
 npm run build
 ```
 
-### Usage
+### Setup
 
-1. Open the app in your browser
-2. Enter your video idea in the text box
-3. Select your preferred options (style, aspect ratio, quality)
-4. Click **"Create My Video"**
-5. Watch as AI generates your video in real-time
-6. Review, edit, or regenerate individual scenes
-7. Play your final video!
+1. **Get your FREE API key** at [platform.agnes-ai.com](https://platform.agnes-ai.com)
+2. Open the app in your browser
+3. Go to **Settings** and paste your API key
+4. Click **Save & Test** to verify connection
+5. Go to **Create** and start making videos!
 
 ---
 
-## 🆓 Free API — No API Key Required!
+## 🆓 Free API — No Credit Card Required!
 
-This app uses **[Pollinations.ai](https://pollinations.ai)** — a free, open-source AI generation platform.
+This app uses **[Agnes AI](https://platform.agnes-ai.com)** — a completely free AI generation platform.
 
 ### What's Free:
-| Feature | Model | API Key Required |
-|---------|-------|-----------------|
-| Text Generation | GPT-4o-mini | ❌ No |
-| Image Generation | Flux | ❌ No |
-| Video Generation | WAN 2.6 / Veo | ❌ No |
-| Text-to-Speech | Multiple voices | ❌ No |
+| Feature | Model | Cost |
+|---------|-------|------|
+| Text Generation | Agnes 3.0 Flash | FREE |
+| Image Generation | Agnes Image 2.5 Flash | FREE |
+| Video Generation | Agnes Video 2.5 Flash | FREE |
+| **Total per video** | **Full pipeline** | **$0.00** |
 
 ### API Endpoints Used:
 ```
-Text:    POST https://gen.pollinations.ai/v1/chat/completions
-Images:  GET  https://gen.pollinations.ai/image/{prompt}?model=flux
-Video:   GET  https://gen.pollinations.ai/video/{prompt}?model=wan
-Audio:   GET  https://gen.pollinations.ai/audio/{text}?voice=nova
+Base:    https://apihub.agnes-ai.com
+Text:    POST /v1/chat/completions (OpenAI-compatible)
+Images:  POST /images/generations
+Video:   POST /videos (async with polling)
+Poll:    GET /agnesapi?video_id={id}
 ```
-
-### Optional: Higher Rate Limits
-For higher rate limits, get a free API key at [enter.pollinations.ai/keys](https://enter.pollinations.ai/keys)
 
 ---
 
@@ -120,7 +117,7 @@ For higher rate limits, get a free API key at [enter.pollinations.ai/keys](https
 - **State**: React Context + useReducer
 - **Routing**: React Router v6
 - **Icons**: Lucide React
-- **AI APIs**: Pollinations.ai (free tier)
+- **AI APIs**: Agnes AI (free tier)
 
 ### Project Structure
 ```
@@ -138,7 +135,7 @@ src/
 │   ├── AssetsPage.tsx         # Generated assets
 │   └── SettingsPage.tsx       # API configuration
 ├── services/
-│   └── pollinations.ts        # Pollinations API client
+│   └── agnes.ts               # Agnes AI API client
 ├── store/
 │   └── AppContext.tsx          # Global state management
 ├── types/
@@ -150,12 +147,11 @@ src/
 ### AI Provider Architecture
 ```
 ┌─────────────────────────────────────────┐
-│         Pollinations.ai (Free)          │
+│         Agnes AI (Free)                 │
 ├─────────────────────────────────────────┤
-│  Text    → GPT-4o-mini                  │
-│  Images  → Flux / Flux-Realism / Turbo  │
-│  Video   → WAN 2.6 / Veo               │
-│  Audio   → ElevenLabs voices            │
+│  Text    → Agnes 3.0 Flash              │
+│  Images  → Agnes Image 2.5 Flash        │
+│  Video   → Agnes Video 2.5 Flash        │
 └─────────────────────────────────────────┘
 ```
 
@@ -164,7 +160,7 @@ src/
 ## 🎬 How It Works
 
 ### 1. Story Generation
-Your text idea is sent to GPT-4o-mini which creates:
+Your text idea is sent to Agnes 3.0 Flash which creates:
 - A compelling 15-second story
 - A project title
 - Visual narrative structure
@@ -193,9 +189,10 @@ Each scene gets a unique AI-generated image using:
 
 ### 5. Video Generation
 Each scene image is animated into a video clip using:
-- WAN 2.6 model for natural motion
+- Agnes Video 2.5 Flash model
+- Reference image mode for consistency
 - Camera movement prompts
-- Scene-appropriate duration
+- Scene-appropriate duration (4-5 seconds)
 
 ### 6. Assembly
 All clips are combined into a 15-second timeline with:
@@ -205,19 +202,35 @@ All clips are combined into a 15-second timeline with:
 
 ---
 
+## ⚡ Performance & Timing
+
+| Step | Duration | Notes |
+|------|----------|-------|
+| Story Generation | 5-10s | Text API call |
+| Character Creation | 5-10s | Text API call |
+| Scene Planning | 5-10s | Text API call |
+| Image Generation | 10-20s per image | Agnes Image API |
+| Video Generation | 2-5 min per clip | Agnes Video API |
+| **Total** | **10-20 minutes** | For 4-scene video |
+
+**Note:** Video generation is the slowest step. Each 4-5 second clip takes 2-5 minutes to generate.
+
+---
+
 ## 🔧 Configuration
+
+### API Key
+Your API key is stored locally in your browser's localStorage:
+```javascript
+localStorage.setItem('agnes_api_key', 'your-key-here');
+```
 
 ### Environment Variables (Optional)
 ```env
-# For higher rate limits only - app works without these
-POLLINATIONS_API_KEY=sk_your_key_here
+# Not required - key is stored in browser
+# But you can set defaults if needed
+VITE_AGNES_API_KEY=your_key_here
 ```
-
-### Settings Page
-- View API health status
-- Check available models
-- Optional API key configuration
-- Architecture overview
 
 ---
 
@@ -252,12 +265,13 @@ npm run typecheck # TypeScript type checking
 ```
 
 ### Adding New AI Models
-Edit `src/services/pollinations.ts` to add new models:
+Edit `src/services/agnes.ts` to add new models:
 ```typescript
-export const IMAGE_MODELS = [
-  { id: 'flux', name: 'Flux', quality: 'high' },
-  { id: 'new-model', name: 'New Model', quality: 'high' },
-];
+export const AGNES_MODELS = {
+  text: ['agnes-3.0-flash', 'agnes-2.5-flash'],
+  image: ['agnes-image-2.5-flash', 'agnes-image-2.1-flash'],
+  video: ['agnes-video-2.5-flash', 'agnes-video-v2.0'],
+};
 ```
 
 ### Customizing the Pipeline
@@ -273,22 +287,20 @@ Edit `src/utils/generationEngine.ts` to modify:
 
 | Component | Cost | Notes |
 |-----------|------|-------|
-| Text Generation | FREE | Pollinations.ai free tier |
-| Image Generation | FREE | Flux model, no key needed |
-| Video Generation | FREE | WAN 2.6, no key needed |
-| Audio/TTS | FREE | Multiple voices |
+| Text Generation | FREE | Agnes AI free tier |
+| Image Generation | FREE | Agnes Image API |
+| Video Generation | FREE | Agnes Video API |
 | **Total per video** | **$0.00** | Unlimited generation |
 
 ---
 
 ## 🔒 Privacy & Security
 
-- ✅ No API keys required for basic usage
-- ✅ All API calls go directly to Pollinations.ai
+- ✅ API key stored locally in browser only
+- ✅ All API calls go directly to Agnes AI
 - ✅ No backend server needed
 - ✅ No data stored on external servers
-- ✅ Generated media expires after 30 days
-- ✅ Optional API key stored locally only
+- ✅ No credit card required
 
 ---
 
@@ -312,10 +324,8 @@ MIT License — free for personal and commercial use.
 
 ## 🙏 Credits
 
-- **[Pollinations.ai](https://pollinations.ai)** — Free AI generation APIs
-- **[Flux](https://blackforestlabs.ai)** — Image generation model
-- **[WAN 2.6](https://github.com/Wan-Video/Wan2.1)** — Video generation model
-- **[OpenAI](https://openai.com)** — GPT-4o-mini text model
+- **[Agnes AI](https://platform.agnes-ai.com)** — Free AI generation APIs
+- **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** — Reference implementation
 - **[React](https://react.dev)** — UI framework
 - **[Tailwind CSS](https://tailwindcss.com)** — Styling
 - **[Lucide](https://lucide.dev)** — Icons
@@ -324,9 +334,9 @@ MIT License — free for personal and commercial use.
 
 ## 🐛 Known Limitations
 
-1. **Video Generation Time** — AI video generation can take 30-120 seconds per clip
+1. **Video Generation Time** — Each video clip takes 2-5 minutes to generate
 2. **Character Consistency** — While improved with character bibles, perfect consistency depends on the AI model
-3. **Rate Limits** — Free tier has rate limits; add API key for higher limits
+3. **Rate Limits** — Agnes AI has generous but not unlimited rate limits
 4. **Video Combination** — Current version shows scenes sequentially; full video merging requires server-side FFmpeg
 
 ---
@@ -348,12 +358,12 @@ MIT License — free for personal and commercial use.
 
 ## 💬 Support
 
-- **Documentation**: [Pollinations.ai Docs](https://gen.pollinations.ai/docs)
+- **Agnes AI Platform**: [platform.agnes-ai.com](https://platform.agnes-ai.com)
+- **Reference Project**: [agnes-video-generator](https://github.com/lcy362/agnes-video-generator)
 - **Issues**: Open a GitHub issue
-- **Discord**: [Pollinations Community](https://discord.gg/pollinations-ai-885844321461485618)
 
 ---
 
-**Made with ❤️ using free AI APIs**
+**Made with ❤️ using Agnes AI's free APIs**
 
 *No credit card. No subscription. No limits. Just create.*
