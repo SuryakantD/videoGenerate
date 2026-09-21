@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { Scene, Character } from '../types';
+import { downloadVideo, downloadImage } from '../services/pollinations';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -595,7 +596,8 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
   const isCompleted = project.status === 'Completed';
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [showVideo, setShowVideo] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
 
   useEffect(() => {
     if (!playing || !project.scenes?.length) return;
@@ -630,8 +632,67 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
     setPlaying(true);
   };
 
+  const handleExportAll = async () => {
+    setExporting(true);
+    setExportMessage('Preparing downloads...');
+    
+    try {
+      // Download all scene images
+      for (let i = 0; i < project.scenes.length; i++) {
+        const scene = project.scenes[i];
+        if (scene.generatedImage) {
+          setExportMessage(`Downloading scene ${i + 1} image...`);
+          await downloadImage(scene.generatedImage, `${project.title}-scene-${i + 1}.png`);
+          await new Promise(r => setTimeout(r, 500)); // Small delay between downloads
+        }
+      }
+      
+      // Download all scene videos
+      for (let i = 0; i < project.scenes.length; i++) {
+        const scene = project.scenes[i];
+        if (scene.generatedVideo) {
+          setExportMessage(`Downloading scene ${i + 1} video...`);
+          await downloadVideo(scene.generatedVideo, `${project.title}-scene-${i + 1}.mp4`);
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      
+      setExportMessage('✅ All files downloaded!');
+      setTimeout(() => setExportMessage(''), 3000);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportMessage('❌ Export failed. Try right-clicking to save manually.');
+      setTimeout(() => setExportMessage(''), 5000);
+    }
+    
+    setExporting(false);
+  };
+
+  const handleExportCurrentImage = async () => {
+    const scene = project.scenes?.[currentSceneIndex];
+    if (scene?.generatedImage) {
+      try {
+        await downloadImage(scene.generatedImage, `${project.title}-scene-${currentSceneIndex + 1}.png`);
+      } catch (error) {
+        // Fallback: open in new tab
+        window.open(scene.generatedImage, '_blank');
+      }
+    }
+  };
+
+  const handleExportCurrentVideo = async () => {
+    const scene = project.scenes?.[currentSceneIndex];
+    if (scene?.generatedVideo) {
+      try {
+        await downloadVideo(scene.generatedVideo, `${project.title}-scene-${currentSceneIndex + 1}.mp4`);
+      } catch (error) {
+        // Fallback: open in new tab
+        window.open(scene.generatedVideo, '_blank');
+      }
+    }
+  };
+
   const currentScene = project.scenes?.[currentSceneIndex];
-  const hasVideoUrl = currentScene?.generatedVideo;
 
   return (
     <div className="space-y-6">
@@ -642,7 +703,7 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
             <>
               {/* Real video or image fallback */}
               <div className="relative w-full h-full overflow-hidden">
-                {playing && hasVideoUrl && showVideo ? (
+                {playing && currentScene?.generatedVideo ? (
                   <video
                     key={currentSceneIndex}
                     src={currentScene.generatedVideo}
@@ -650,7 +711,6 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                     autoPlay
                     muted
                     playsInline
-                    onError={() => setShowVideo(false)}
                   />
                 ) : currentScene?.generatedImage ? (
                   <img
@@ -660,6 +720,10 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
                     style={{
                       transform: playing ? 'scale(1.03)' : 'scale(1)',
                       transition: 'transform 8s ease-in-out',
+                    }}
+                    onError={(e) => {
+                      // If image fails to load, show placeholder
+                      (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
                 ) : (
@@ -758,25 +822,71 @@ function FinalVideoTab({ project, playing, setPlaying }: { project: any; playing
         )}
       </div>
 
-      {/* Action Buttons */}
+      {/* Export Message */}
+      {exportMessage && (
+        <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 text-center">
+          <p className="text-white text-sm">{exportMessage}</p>
+        </div>
+      )}
+
+      {/* Export Buttons */}
       {isCompleted && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button className="flex items-center justify-center gap-2 py-3 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors text-sm font-medium">
-            <RotateCcw size={14} />
-            Regenerate
-          </button>
-          <button className="flex items-center justify-center gap-2 py-3 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors text-sm font-medium">
-            <Edit3 size={14} />
-            Edit Project
-          </button>
-          <button className="flex items-center justify-center gap-2 py-3 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors text-sm font-medium">
-            <Sparkles size={14} />
-            New Version
-          </button>
-          <button className="flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-bold hover:from-violet-500 hover:to-fuchsia-500 transition-all text-sm">
-            <Download size={14} />
-            Export Video
-          </button>
+        <div className="space-y-4">
+          {/* Scene-specific exports */}
+          <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-4">
+            <h4 className="text-white font-semibold text-sm mb-3">Export Current Scene ({currentSceneIndex + 1})</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={handleExportCurrentImage}
+                disabled={!currentScene?.generatedImage}
+                className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={14} />
+                Export Image
+              </button>
+              <button
+                onClick={handleExportCurrentVideo}
+                disabled={!currentScene?.generatedVideo}
+                className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={14} />
+                Export Video
+              </button>
+            </div>
+          </div>
+
+          {/* Full project export */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button className="flex items-center justify-center gap-2 py-3 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors text-sm font-medium">
+              <RotateCcw size={14} />
+              Regenerate
+            </button>
+            <button className="flex items-center justify-center gap-2 py-3 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors text-sm font-medium">
+              <Edit3 size={14} />
+              Edit Project
+            </button>
+            <button className="flex items-center justify-center gap-2 py-3 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 hover:bg-gray-700 transition-colors text-sm font-medium">
+              <Sparkles size={14} />
+              New Version
+            </button>
+            <button
+              onClick={handleExportAll}
+              disabled={exporting}
+              className="flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-bold hover:from-violet-500 hover:to-fuchsia-500 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exporting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download size={14} />
+                  Export All
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>

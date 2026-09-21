@@ -10,12 +10,10 @@ import {
   GenerationStep,
 } from '../types';
 import {
-  generateText as agnesGenerateText,
-  generateImage as agnesGenerateImage,
-  submitVideo as agnesSubmitVideo,
-  waitForVideo as agnesWaitForVideo,
-  getApiKey,
-} from '../services/agnes';
+  generateText,
+  generateImageUrl,
+  generateVideoUrl,
+} from '../services/pollinations';
 
 // ============ PROMPT ENGINE ============
 function buildCharacterBible(char: Character): string {
@@ -65,10 +63,7 @@ async function generateStoryFromAI(prompt: string): Promise<{ title: string; sto
   const userPrompt = `Create a 15-second video story based on this concept: "${prompt}". Return JSON: {"title": "...", "story": "..."}`;
 
   try {
-    const response = await agnesGenerateText([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await generateText(userPrompt, systemPrompt);
     
     // Try to parse JSON from response
     const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -97,10 +92,7 @@ async function generateCharactersFromAI(prompt: string): Promise<Character[]> {
   const userPrompt = `Based on this video concept: "${prompt}", identify all characters and create detailed character descriptions. Return JSON array: [{"name": "...", "age": number, "gender": "Male/Female", "ethnicity": "...", "skinTone": "...", "hair": "...", "eyes": "...", "face": "...", "body": "...", "clothing": "...", "accessories": "...", "personality": "..."}]`;
 
   try {
-    const response = await agnesGenerateText([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await generateText(userPrompt, systemPrompt);
     
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
@@ -150,10 +142,7 @@ async function generateLocationsFromAI(prompt: string): Promise<Location[]> {
   const userPrompt = `For this video: "${prompt}", identify 1-3 key locations. Return JSON: [{"name": "...", "description": "detailed visual description"}]`;
 
   try {
-    const response = await agnesGenerateText([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await generateText(userPrompt, systemPrompt);
     
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
@@ -196,10 +185,7 @@ async function generateScenesFromAI(
   ];
 
   try {
-    const response = await agnesGenerateText([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ]);
+    const response = await generateText(userPrompt, systemPrompt);
     
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
@@ -274,12 +260,6 @@ export async function generateProject(
   projectId: string,
   updateStep: (stepId: string, status: GenerationStep['status'], progress: number) => void
 ): Promise<Project> {
-  // Check API key
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error('Please set your Agnes AI API key in Settings. Get a free key at https://platform.agnes-ai.com');
-  }
-
   const steps: GenerationStep[] = [
     { id: 'understanding', label: 'Understanding your idea', status: 'pending', progress: 0 },
     { id: 'story', label: 'Creating story with AI', status: 'pending', progress: 0 },
@@ -298,27 +278,27 @@ export async function generateProject(
   await delay(500);
   updateStep('understanding', 'completed', 100);
 
-  // Step 2: Generate Story (REAL AI - Agnes)
+  // Step 2: Generate Story (REAL AI - Pollinations)
   updateStep('story', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Story' } });
   const { title, story } = await generateStoryFromAI(prompt);
   dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, title, story } });
   updateStep('story', 'completed', 100);
 
-  // Step 3: Generate Characters (REAL AI - Agnes)
+  // Step 3: Generate Characters (REAL AI - Pollinations)
   updateStep('characters', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Characters' } });
   const characters = await generateCharactersFromAI(prompt);
   dispatch({ type: 'UPDATE_CHARACTERS', payload: { projectId, characters } });
   updateStep('characters', 'completed', 100);
 
-  // Step 4: Generate Locations (REAL AI - Agnes)
+  // Step 4: Generate Locations (REAL AI - Pollinations)
   updateStep('locations', 'active', 0);
   const locations = await generateLocationsFromAI(prompt);
   dispatch({ type: 'UPDATE_LOCATIONS', payload: { projectId, locations } });
   updateStep('locations', 'completed', 100);
 
-  // Step 5: Generate Storyboard (REAL AI - Agnes)
+  // Step 5: Generate Storyboard (REAL AI - Pollinations)
   updateStep('storyboard', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Storyboard' } });
   let scenes = await generateScenesFromAI(prompt, story, characters, locations, style);
@@ -336,89 +316,63 @@ export async function generateProject(
   });
   updateStep('storyboard', 'completed', 100);
 
-  // Step 6: Generate Images (REAL AI - Agnes)
+  // Step 6: Generate Images (REAL AI - Pollinations)
   updateStep('images', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Images' } });
 
-  const imageSize = aspectRatio === '9:16' ? '576x1024' :
-                    aspectRatio === '1:1' ? '768x768' :
-                    '1024x576';
+  const imageDimensions = aspectRatio === '9:16' ? { width: 576, height: 1024 } :
+                          aspectRatio === '1:1' ? { width: 768, height: 768 } :
+                          { width: 1024, height: 576 };
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    try {
-      // Generate REAL image from Agnes AI
-      const imageUrl = await agnesGenerateImage(scene.imagePrompt, {
-        size: imageSize,
-        model: quality === 'High Quality' ? 'agnes-image-2.5-flash' : 'agnes-image-2.1-flash',
-      });
+    
+    // Generate REAL image URL from Pollinations
+    const imageUrl = generateImageUrl(scene.imagePrompt, {
+      ...imageDimensions,
+      model: quality === 'High Quality' ? 'flux' : 'turbo',
+      seed: projectId.charCodeAt(0) * 1000 + i * 100,
+    });
 
-      const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
-      scenes[i] = updatedScene;
+    // Update scene with generated image
+    const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
+    scenes[i] = updatedScene;
 
-      dispatch({
-        type: 'UPDATE_SCENE',
-        payload: { projectId, scene: updatedScene },
-      });
-    } catch (error) {
-      console.error(`Image generation failed for scene ${i + 1}:`, error);
-      // Mark as failed but continue
-      const updatedScene = { ...scene, status: 'failed' as const };
-      scenes[i] = updatedScene;
-      dispatch({
-        type: 'UPDATE_SCENE',
-        payload: { projectId, scene: updatedScene },
-      });
-    }
+    dispatch({
+      type: 'UPDATE_SCENE',
+      payload: { projectId, scene: updatedScene },
+    });
 
     const progress = ((i + 1) / scenes.length) * 100;
     updateStep('images', 'active', progress);
+    await delay(800); // Small delay between images
   }
   updateStep('images', 'completed', 100);
 
-  // Step 7: Generate Videos (REAL AI - Agnes)
+  // Step 7: Generate Video URLs (REAL AI - Pollinations)
   updateStep('video', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Video' } });
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    if (scene.status === 'failed' || !scene.generatedImage) {
-      continue; // Skip failed scenes
-    }
+    
+    // Generate video URL from Pollinations
+    const videoUrl = generateVideoUrl(scene.videoPrompt, {
+      model: 'wan',
+      duration: Math.min(scene.duration, 5),
+    });
 
-    try {
-      // Submit video generation task
-      const videoId = await agnesSubmitVideo(scene.videoPrompt, {
-        model: 'agnes-video-2.5-flash',
-        duration: Math.min(scene.duration, 5),
-        aspectRatio,
-        referenceImage: scene.generatedImage,
-      });
+    const updatedScene = { ...scene, generatedVideo: videoUrl };
+    scenes[i] = updatedScene;
 
-      // Wait for video completion with progress
-      const videoUrl = await agnesWaitForVideo(
-        videoId,
-        (status, progress) => {
-          const sceneProgress = (i / scenes.length) * 100 + (progress / 100) * (100 / scenes.length);
-          updateStep('video', 'active', sceneProgress);
-        },
-        'agnes-video-2.5-flash'
-      );
-
-      const updatedScene = { ...scene, generatedVideo: videoUrl };
-      scenes[i] = updatedScene;
-
-      dispatch({
-        type: 'UPDATE_SCENE',
-        payload: { projectId, scene: updatedScene },
-      });
-    } catch (error) {
-      console.error(`Video generation failed for scene ${i + 1}:`, error);
-      // Continue with other scenes
-    }
+    dispatch({
+      type: 'UPDATE_SCENE',
+      payload: { projectId, scene: updatedScene },
+    });
 
     const progress = ((i + 1) / scenes.length) * 100;
     updateStep('video', 'active', progress);
+    await delay(500);
   }
   updateStep('video', 'completed', 100);
 
@@ -456,7 +410,7 @@ export async function generateProject(
 }
 
 export function estimateCost(numScenes: number, quality: 'Standard' | 'High Quality'): { images: number; videos: number; estimatedCost: number } {
-  // Agnes AI is FREE!
+  // Pollinations.ai is FREE!
   return { images: numScenes, videos: numScenes, estimatedCost: 0 };
 }
 

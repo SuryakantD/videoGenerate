@@ -35,20 +35,13 @@ const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1'];
 
 export default function CreatePage() {
   const navigate = useNavigate();
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('Cinematic');
   const [quality, setQuality] = useState<VideoQuality>('High Quality');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(!!localStorage.getItem('agnes_api_key'));
-
-  useEffect(() => {
-    const checkKey = () => setHasApiKey(!!localStorage.getItem('agnes_api_key'));
-    window.addEventListener('storage', checkKey);
-    return () => window.removeEventListener('storage', checkKey);
-  }, []);
 
   const cost = estimateCost(4, quality);
 
@@ -95,7 +88,12 @@ export default function CreatePage() {
       dispatch({ type: 'UPDATE_GENERATION_STEP', payload: { stepId, status, progress } });
     };
 
-    await generateProject(prompt, 15, aspectRatio, visualStyle, quality, dispatch, projectId, updateStep);
+    try {
+      await generateProject(prompt, 15, aspectRatio, visualStyle, quality, dispatch, projectId, updateStep);
+    } catch (error) {
+      console.error('Generation failed:', error);
+      dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Failed' } });
+    }
 
     setIsGenerating(false);
     dispatch({ type: 'SET_GENERATING', payload: false });
@@ -108,29 +106,6 @@ export default function CreatePage() {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-fuchsia-500/5 rounded-full blur-3xl" />
       </div>
-
-      {/* API Key Warning */}
-      {!hasApiKey && (
-        <div className="relative bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-yellow-400 text-lg">⚠️</span>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-yellow-300 font-semibold text-sm mb-1">API Key Required</h3>
-              <p className="text-gray-400 text-xs mb-2">
-                You need a free Agnes AI API key to generate videos. Get one at platform.agnes-ai.com
-              </p>
-              <button
-                onClick={() => navigate('/settings')}
-                className="text-violet-400 hover:text-violet-300 text-xs font-medium underline"
-              >
-                Go to Settings →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Header */}
       <div className="relative text-center mb-10">
@@ -272,7 +247,7 @@ export default function CreatePage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <DollarSign size={16} className="text-green-400" />
-            <span className="text-gray-300 text-sm">AI Generation Cost (Agnes AI):</span>
+            <span className="text-gray-300 text-sm">AI Generation Cost (Pollinations.ai):</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -284,72 +259,13 @@ export default function CreatePage() {
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={!prompt.trim() || isGenerating || !hasApiKey}
+        disabled={!prompt.trim() || isGenerating}
         className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl transition-all shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 flex items-center justify-center gap-3"
       >
         <Sparkles size={20} />
-        {!hasApiKey ? 'Set API Key First' : 'Create My Video'}
+        Create My Video
         <ArrowRight size={20} />
       </button>
-
-      {/* Recent Projects */}
-      <RecentProjectsSection />
-
-      {/* Features */}
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-5">
-          <div className="w-10 h-10 bg-violet-500/10 rounded-lg flex items-center justify-center mb-3">
-            <User size={18} className="text-violet-400" />
-          </div>
-          <h4 className="text-white font-semibold text-sm mb-1">Character Consistency</h4>
-          <p className="text-gray-500 text-xs">AI maintains consistent character appearance across all scenes using character bibles.</p>
-        </div>
-        <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-5">
-          <div className="w-10 h-10 bg-fuchsia-500/10 rounded-lg flex items-center justify-center mb-3">
-            <Camera size={18} className="text-fuchsia-400" />
-          </div>
-          <h4 className="text-white font-semibold text-sm mb-1">Smart Storyboarding</h4>
-          <p className="text-gray-500 text-xs">Automatically plans scenes with appropriate camera movements and transitions.</p>
-        </div>
-        <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-5">
-          <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center mb-3">
-            <Film size={18} className="text-blue-400" />
-          </div>
-          <h4 className="text-white font-semibold text-sm mb-1">Full Pipeline</h4>
-          <p className="text-gray-500 text-xs">From text to final video — story, characters, images, animation, music, and rendering.</p>
-        </div>
-      </div>
-
-      {/* Pipeline Visualization */}
-      <div className="mt-6 bg-gray-800/30 rounded-2xl border border-gray-700/30 p-6">
-        <h3 className="text-white font-semibold text-sm mb-2 text-center">Real AI Generation Pipeline</h3>
-        <p className="text-gray-500 text-xs text-center mb-4">Powered by Agnes AI — 100% Free</p>
-        <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
-          {[
-            { label: 'Your Idea', color: 'bg-violet-500/20 text-violet-300 border-violet-500/30' },
-            { label: '→' },
-            { label: 'Agnes Text', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-            { label: '→' },
-            { label: 'Characters', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
-            { label: '→' },
-            { label: 'Scenes', color: 'bg-teal-500/20 text-teal-300 border-teal-500/30' },
-            { label: '→' },
-            { label: 'Agnes Image', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
-            { label: '→' },
-            { label: 'Agnes Video', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-            { label: '→' },
-            { label: 'Final Video', color: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30' },
-          ].map((item, i) =>
-            item.color ? (
-              <span key={i} className={`px-2.5 py-1 rounded-full border font-medium ${item.color}`}>
-                {item.label}
-              </span>
-            ) : (
-              <span key={i} className="text-gray-600">{item.label}</span>
-            )
-          )}
-        </div>
-      </div>
 
       {/* Confirmation Modal */}
       {showConfirm && (
@@ -394,6 +310,65 @@ export default function CreatePage() {
           </div>
         </div>
       )}
+
+      {/* Recent Projects */}
+      <RecentProjectsSection />
+
+      {/* Features */}
+      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-5">
+          <div className="w-10 h-10 bg-violet-500/10 rounded-lg flex items-center justify-center mb-3">
+            <User size={18} className="text-violet-400" />
+          </div>
+          <h4 className="text-white font-semibold text-sm mb-1">Character Consistency</h4>
+          <p className="text-gray-500 text-xs">AI maintains consistent character appearance across all scenes using character bibles.</p>
+        </div>
+        <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-5">
+          <div className="w-10 h-10 bg-fuchsia-500/10 rounded-lg flex items-center justify-center mb-3">
+            <Camera size={18} className="text-fuchsia-400" />
+          </div>
+          <h4 className="text-white font-semibold text-sm mb-1">Smart Storyboarding</h4>
+          <p className="text-gray-500 text-xs">Automatically plans scenes with appropriate camera movements and transitions.</p>
+        </div>
+        <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-5">
+          <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center mb-3">
+            <Film size={18} className="text-blue-400" />
+          </div>
+          <h4 className="text-white font-semibold text-sm mb-1">Full Pipeline</h4>
+          <p className="text-gray-500 text-xs">From text to final video — story, characters, images, animation, music, and rendering.</p>
+        </div>
+      </div>
+
+      {/* Pipeline Visualization */}
+      <div className="mt-6 bg-gray-800/30 rounded-2xl border border-gray-700/30 p-6">
+        <h3 className="text-white font-semibold text-sm mb-2 text-center">Real AI Generation Pipeline</h3>
+        <p className="text-gray-500 text-xs text-center mb-4">Powered by Pollinations.ai — 100% Free</p>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+          {[
+            { label: 'Your Idea', color: 'bg-violet-500/20 text-violet-300 border-violet-500/30' },
+            { label: '→' },
+            { label: 'GPT-4o-mini', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+            { label: '→' },
+            { label: 'Characters', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
+            { label: '→' },
+            { label: 'Scenes', color: 'bg-teal-500/20 text-teal-300 border-teal-500/30' },
+            { label: '→' },
+            { label: 'Flux Images', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
+            { label: '→' },
+            { label: 'WAN Video', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
+            { label: '→' },
+            { label: 'Final Video', color: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30' },
+          ].map((item, i) =>
+            item.color ? (
+              <span key={i} className={`px-2.5 py-1 rounded-full border font-medium ${item.color}`}>
+                {item.label}
+              </span>
+            ) : (
+              <span key={i} className="text-gray-600">{item.label}</span>
+            )
+          )}
+        </div>
+      </div>
     </div>
   );
 }
