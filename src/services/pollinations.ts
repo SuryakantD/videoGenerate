@@ -1,7 +1,7 @@
-// Pollinations.ai API - Free, no API key needed, works from browser
-// Docs: https://pollinations.ai
+// Hugging Face Inference API - Free tier, works from browser
+// Docs: https://huggingface.co/docs/inference-api
 
-const POLLINATIONS_BASE = 'https://gen.pollinations.ai';
+const HF_BASE = 'https://api-inference.huggingface.co';
 
 // ============ TEXT GENERATION ============
 export async function generateText(
@@ -15,15 +15,17 @@ export async function generateText(
   messages.push({ role: 'user', content: prompt });
 
   try {
-    const response = await fetch(`${POLLINATIONS_BASE}/v1/chat/completions`, {
+    const response = await fetch(`${HF_BASE}/models/mistralai/Mistral-7B-Instruct-v0.3`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai',
-        messages,
-        private: true,
+        inputs: messages.map(m => `${m.role}: ${m.content}`).join('\n'),
+        parameters: {
+          max_new_tokens: 500,
+          temperature: 0.7,
+        },
       }),
     });
 
@@ -32,7 +34,7 @@ export async function generateText(
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    return data[0]?.generated_text || '';
   } catch (error) {
     console.error('Text generation error:', error);
     throw error;
@@ -48,27 +50,17 @@ export function generateImageUrl(
     height?: number;
     model?: string;
     seed?: number;
-    nologo?: boolean;
   } = {}
 ): string {
   const {
     width = 1024,
     height = 576,
-    model = 'flux',
     seed = Math.floor(Math.random() * 1000000),
-    nologo = true,
   } = options;
 
+  // Use Hugging Face's free image generation
   const encodedPrompt = encodeURIComponent(prompt);
-  const params = new URLSearchParams({
-    model,
-    width: width.toString(),
-    height: height.toString(),
-    seed: seed.toString(),
-    nologo: nologo.toString(),
-  });
-
-  return `${POLLINATIONS_BASE}/image/${encodedPrompt}?${params.toString()}`;
+  return `${HF_BASE}/models/stabilityai/stable-diffusion-xl-base-1.0?inputs=${encodedPrompt}&width=${width}&height=${height}&seed=${seed}`;
 }
 
 // ============ VIDEO GENERATION ============
@@ -80,14 +72,27 @@ export function generateVideoUrl(
     duration?: number;
   } = {}
 ): string {
-  const { model = 'wan', duration = 4 } = options;
+  const { duration = 4 } = options;
   const encodedPrompt = encodeURIComponent(prompt);
-  return `${POLLINATIONS_BASE}/video/${encodedPrompt}?model=${model}&duration=${duration}`;
+  // Use a free video generation model
+  return `${HF_BASE}/models/damo-vilab/text-to-video-ms-1.7b?inputs=${encodedPrompt}&num_frames=${duration * 8}`;
 }
 
 // ============ EXPORT FUNCTIONALITY ============
 export async function downloadFile(url: string, filename: string): Promise<void> {
   try {
+    // Check if it's a blob URL (already in memory)
+    if (url.startsWith('blob:')) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    // Otherwise fetch from remote
     const response = await fetch(url);
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);
@@ -130,8 +135,10 @@ export async function checkApiHealth(): Promise<{
 
   // Check text API
   try {
-    const response = await fetch(`${POLLINATIONS_BASE}/v1/models`);
-    result.text = response.ok;
+    const response = await fetch(`${HF_BASE}/models/mistralai/Mistral-7B-Instruct-v0.3`, {
+      method: 'OPTIONS',
+    });
+    result.text = response.ok || response.status === 204;
   } catch {
     result.text = false;
   }
@@ -139,4 +146,4 @@ export async function checkApiHealth(): Promise<{
   return result;
 }
 
-export const POLLINATIONS_SIGNUP_URL = 'https://pollinations.ai';
+export const POLLINATIONS_SIGNUP_URL = 'https://huggingface.co';

@@ -316,7 +316,7 @@ export async function generateProject(
   });
   updateStep('storyboard', 'completed', 100);
 
-  // Step 6: Generate Images (REAL AI - Pollinations)
+  // Step 6: Generate Images (REAL AI - Hugging Face)
   updateStep('images', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Images' } });
 
@@ -327,21 +327,40 @@ export async function generateProject(
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     
-    // Generate REAL image URL from Pollinations
-    const imageUrl = generateImageUrl(scene.imagePrompt, {
-      ...imageDimensions,
-      model: quality === 'High Quality' ? 'flux' : 'turbo',
-      seed: projectId.charCodeAt(0) * 1000 + i * 100,
-    });
+    try {
+      // Generate REAL image from Hugging Face
+      const imageUrl = generateImageUrl(scene.imagePrompt, {
+        ...imageDimensions,
+        seed: projectId.charCodeAt(0) * 1000 + i * 100,
+      });
 
-    // Update scene with generated image
-    const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
-    scenes[i] = updatedScene;
+      // Fetch the image and convert to blob URL
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Image generation failed: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
 
-    dispatch({
-      type: 'UPDATE_SCENE',
-      payload: { projectId, scene: updatedScene },
-    });
+      // Update scene with generated image
+      const updatedScene = { ...scene, generatedImage: blobUrl, status: 'completed' as const };
+      scenes[i] = updatedScene;
+
+      dispatch({
+        type: 'UPDATE_SCENE',
+        payload: { projectId, scene: updatedScene },
+      });
+    } catch (error) {
+      console.error(`Image generation failed for scene ${i + 1}:`, error);
+      // Mark as failed but continue
+      const updatedScene = { ...scene, status: 'failed' as const };
+      scenes[i] = updatedScene;
+      dispatch({
+        type: 'UPDATE_SCENE',
+        payload: { projectId, scene: updatedScene },
+      });
+    }
 
     const progress = ((i + 1) / scenes.length) * 100;
     updateStep('images', 'active', progress);
@@ -349,26 +368,43 @@ export async function generateProject(
   }
   updateStep('images', 'completed', 100);
 
-  // Step 7: Generate Video URLs (REAL AI - Pollinations)
+  // Step 7: Generate Videos (REAL AI - Hugging Face)
   updateStep('video', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Video' } });
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     
-    // Generate video URL from Pollinations
-    const videoUrl = generateVideoUrl(scene.videoPrompt, {
-      model: 'wan',
-      duration: Math.min(scene.duration, 5),
-    });
+    if (scene.status === 'failed') {
+      continue; // Skip failed scenes
+    }
 
-    const updatedScene = { ...scene, generatedVideo: videoUrl };
-    scenes[i] = updatedScene;
+    try {
+      // Generate video from Hugging Face
+      const videoUrl = generateVideoUrl(scene.videoPrompt, {
+        duration: Math.min(scene.duration, 5),
+      });
 
-    dispatch({
-      type: 'UPDATE_SCENE',
-      payload: { projectId, scene: updatedScene },
-    });
+      // Fetch the video and convert to blob URL
+      const response = await fetch(videoUrl);
+      if (!response.ok) {
+        throw new Error(`Video generation failed: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const updatedScene = { ...scene, generatedVideo: blobUrl };
+      scenes[i] = updatedScene;
+
+      dispatch({
+        type: 'UPDATE_SCENE',
+        payload: { projectId, scene: updatedScene },
+      });
+    } catch (error) {
+      console.error(`Video generation failed for scene ${i + 1}:`, error);
+      // Continue with other scenes
+    }
 
     const progress = ((i + 1) / scenes.length) * 100;
     updateStep('video', 'active', progress);

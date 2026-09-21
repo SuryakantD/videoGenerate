@@ -2,9 +2,9 @@
 
 > **Create stunning AI-generated 15-second videos from text ideas — 100% FREE**
 
-A full end-to-end AI video production pipeline that transforms your text ideas into real AI-generated videos using Pollinations.ai's free API.
+A full end-to-end AI video production pipeline that transforms your text ideas into real AI-generated videos using Hugging Face's free Inference API.
 
-![AI Video Studio](https://img.shields.io/badge/AI-Video%20Generator-violet) ![Free](https://img.shields.io/badge/Cost-100%25%20Free-green) ![Pollinations](https://img.shields.io/badge/Powered%20By-Pollinations.ai-blue)
+![AI Video Studio](https://img.shields.io/badge/AI-Video%20Generator-violet) ![Free](https://img.shields.io/badge/Cost-100%25%20Free-green) ![Hugging Face](https://img.shields.io/badge/Powered%20By-Hugging%20Face-yellow)
 
 ---
 
@@ -91,21 +91,27 @@ npm run build
 
 ## 🆓 Free API — No API Key Required!
 
-This app uses **[Pollinations.ai](https://pollinations.ai)** — a free, open-source AI generation platform.
+This app uses **[Hugging Face Inference API](https://huggingface.co/inference-api)** — a free tier that works directly from the browser.
 
 ### What's Free:
 | Feature | Model | API Key Required |
 |---------|-------|-----------------|
-| Text Generation | GPT-4o-mini | ❌ No |
-| Image Generation | Flux | ❌ No |
-| Video Generation | WAN 2.6 | ❌ No |
+| Text Generation | Mistral-7B-Instruct-v0.3 | ❌ No (Free Tier) |
+| Image Generation | Stable Diffusion XL | ❌ No (Free Tier) |
+| Video Generation | Text-to-Video MS 1.7B | ❌ No (Free Tier) |
 
 ### API Endpoints Used:
 ```
-Text:    POST https://gen.pollinations.ai/v1/chat/completions
-Images:  GET  https://gen.pollinations.ai/image/{prompt}?model=flux
-Video:   GET  https://gen.pollinations.ai/video/{prompt}?model=wan
+Text:    POST https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3
+Images:  GET  https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0
+Video:   GET  https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b
 ```
+
+### How It Works:
+1. **Text Generation**: Sends prompts to Mistral-7B for story/character/scene creation
+2. **Image Generation**: Uses Stable Diffusion XL to generate scene images (returns binary data)
+3. **Video Generation**: Uses Text-to-Video model to animate images (returns binary data)
+4. **Blob URLs**: All generated media is converted to blob URLs for instant playback
 
 ---
 
