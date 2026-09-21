@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { Project, ProjectStatus, Scene, Character, Location, GenerationStep } from '../types';
-import { createDemoProjects } from '../utils/demoData';
 
 interface AppState {
   projects: Project[];
@@ -142,12 +141,6 @@ const AppContext = createContext<{
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-
-  // Load demo projects on first render
-  useEffect(() => {
-    const demoProjects = createDemoProjects();
-    dispatch({ type: 'SET_PROJECTS', payload: demoProjects });
-  }, []);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }

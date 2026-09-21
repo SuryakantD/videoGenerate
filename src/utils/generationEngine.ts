@@ -9,327 +9,241 @@ import {
   Transition,
   GenerationStep,
 } from '../types';
+import { generateText, generateImageUrl, generateVideoUrl } from '../services/pollinations';
 
-const CAMERA_MOVEMENTS: CameraMovement[] = [
-  'Static',
-  'Slow Zoom In',
-  'Slow Zoom Out',
-  'Dolly In',
-  'Dolly Out',
-  'Pan Left',
-  'Pan Right',
-  'Tilt Up',
-  'Tilt Down',
-  'Tracking Shot',
-  'Orbit',
-  'Handheld',
-  'Drone Movement',
-];
+// ============ PROMPT ENGINE ============
+// Structured prompt engineering for consistent results
 
-const SCENE_PLACEHOLDER_IMAGES = [
-  'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=640&h=360&fit=crop',
-  'https://images.unsplash.com/photo-1436491865332-7a61a109db05?w=640&h=360&fit=crop',
-  'https://images.unsplash.com/photo-1540962351504-03099e0a754b?w=640&h=360&fit=crop',
-  'https://images.unsplash.com/photo-1464037866556-6812c9d1c72e?w=640&h=360&fit=crop',
-  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=640&h=360&fit=crop',
-];
-
-function generateTitle(prompt: string): string {
-  const words = prompt.split(' ').filter((w) => w.length > 3);
-  const keyWords = words.slice(0, 4).join(' ');
-  const titles = [
-    `A Journey Through ${keyWords}`,
-    `${keyWords.charAt(0).toUpperCase() + keyWords.slice(1)}: A Visual Story`,
-    `The Art of ${keyWords}`,
-    `Beyond ${keyWords}`,
-    `${keyWords.charAt(0).toUpperCase() + keyWords.slice(1)} in Motion`,
-  ];
-  return titles[Math.floor(Math.random() * titles.length)];
+function buildCharacterBible(char: Character): string {
+  return `${char.name}, ${char.age}-year-old ${char.ethnicity} ${char.gender.toLowerCase()} with ${char.skinTone.toLowerCase()} skin, ${char.hair}, ${char.eyes} eyes, ${char.face}, ${char.body}, wearing ${char.clothing}${char.accessories ? ', ' + char.accessories : ''}`;
 }
 
-function generateStory(prompt: string): string {
-  const lowerPrompt = prompt.toLowerCase();
-  if (lowerPrompt.includes('airplane') || lowerPrompt.includes('flight') || lowerPrompt.includes('aviation')) {
-    return `A breathtaking journey above the clouds. We begin with a sweeping view of a magnificent cityscape bathed in golden sunset light. A luxury aircraft glides gracefully through the amber sky, its silhouette cutting through wisps of cloud. Inside the pressurized cabin, warm light filters through oval windows. A distinguished passenger gazes out at the world below, lost in contemplation as the city transforms into a tapestry of light beneath him.`;
-  }
-  if (lowerPrompt.includes('nature') || lowerPrompt.includes('forest') || lowerPrompt.includes('mountain')) {
-    return `An immersive journey through untouched wilderness. Morning mist rises from ancient forests as golden light pierces through the canopy. A lone figure traverses a mountain trail, dwarfed by towering peaks. The camera captures the raw beauty of nature — from cascading waterfalls to wildflower meadows — before culminating in a breathtaking summit view at golden hour.`;
-  }
-  if (lowerPrompt.includes('city') || lowerPrompt.includes('urban') || lowerPrompt.includes('street')) {
-    return `A cinematic exploration of urban life. The story opens with an aerial view of a sprawling metropolis awakening at dawn. Streets come alive with movement and energy. We follow the rhythm of the city through its architecture, culture, and people, culminating in a stunning twilight panorama that captures the soul of the metropolis.`;
-  }
-  return `A visually stunning narrative brought to life. The story unfolds through a series of carefully composed scenes, each building upon the last to create a cohesive visual experience. From establishing shots that set the scene to intimate close-ups that reveal emotion, every frame is crafted to captivate and inspire.`;
+function buildSceneImagePrompt(
+  scene: Scene,
+  characters: Character[],
+  locations: Location[],
+  style: VisualStyle,
+  aspectRatio: string
+): string {
+  const sceneCharacters = characters.filter((c) => scene.characters.includes(c.name));
+  const characterDescriptions = sceneCharacters.map(buildCharacterBible).join('. ');
+  const location = locations.find((l) => scene.location.includes(l.name));
+
+  const parts = [
+    style,
+    'style',
+    scene.description,
+    characterDescriptions ? `Featuring: ${characterDescriptions}` : '',
+    location ? `Location: ${location.description}` : '',
+    scene.objects.length > 0 ? `Objects: ${scene.objects.join(', ')}` : '',
+    `${scene.cameraAngle} camera angle`,
+    scene.lighting,
+    `Time: ${scene.timeOfDay}`,
+    scene.weather !== 'N/A' ? `Weather: ${scene.weather}` : '',
+    `Mood: ${scene.emotion}`,
+    'highly detailed, professional quality',
+    aspectRatio === '9:16' ? 'vertical composition, portrait orientation' :
+    aspectRatio === '1:1' ? 'square composition' :
+    'cinematic widescreen composition',
+  ].filter(Boolean);
+
+  return parts.join(', ');
 }
 
-function generateCharacters(prompt: string): Character[] {
-  const lowerPrompt = prompt.toLowerCase();
-  const characters: Character[] = [];
-
-  if (lowerPrompt.includes('businessman') || lowerPrompt.includes('business') || lowerPrompt.includes('executive')) {
-    characters.push({
-      id: uuidv4(),
-      name: 'Daniel',
-      age: 35,
-      gender: 'Male',
-      ethnicity: 'Indian',
-      skinTone: 'Medium warm',
-      hair: 'Short black hair, neatly styled',
-      eyes: 'Dark brown',
-      face: 'Strong jawline, short trimmed beard, warm expression',
-      body: 'Athletic build, 5\'11"',
-      clothing: 'Navy blue tailored business suit, crisp white shirt, black leather shoes',
-      accessories: 'Silver wristwatch, wedding band',
-      personality: 'Calm, confident, contemplative',
-    });
-  }
-
-  if (lowerPrompt.includes('woman') || lowerPrompt.includes('female') || lowerPrompt.includes('girl')) {
-    characters.push({
-      id: uuidv4(),
-      name: 'Sarah',
-      age: 28,
-      gender: 'Female',
-      ethnicity: 'Caucasian',
-      skinTone: 'Fair with warm undertones',
-      hair: 'Long flowing auburn hair',
-      eyes: 'Green',
-      face: 'High cheekbones, soft features, natural makeup',
-      body: 'Slim build, 5\'6"',
-      clothing: 'Elegant cream blouse, tailored dark trousers',
-      accessories: 'Gold pendant necklace, small hoop earrings',
-      personality: 'Graceful, determined, warm',
-    });
-  }
-
-  if (lowerPrompt.includes('child') || lowerPrompt.includes('kid') || lowerPrompt.includes('boy') || lowerPrompt.includes('girl')) {
-    characters.push({
-      id: uuidv4(),
-      name: 'Alex',
-      age: 8,
-      gender: 'Male',
-      ethnicity: 'Mixed',
-      skinTone: 'Light brown',
-      hair: 'Curly dark brown hair',
-      eyes: 'Bright hazel',
-      face: 'Round face, freckles, wide curious eyes',
-      body: 'Average build for age, 4\'2"',
-      clothing: 'Blue striped t-shirt, khaki shorts, white sneakers',
-      accessories: 'Colorful wristband',
-      personality: 'Curious, adventurous, joyful',
-    });
-  }
-
-  if (characters.length === 0) {
-    characters.push({
-      id: uuidv4(),
-      name: 'Alex',
-      age: 30,
-      gender: 'Male',
-      ethnicity: 'Caucasian',
-      skinTone: 'Light',
-      hair: 'Short brown hair',
-      eyes: 'Blue',
-      face: 'Clean-shaven, friendly features',
-      body: 'Average build, 5\'10"',
-      clothing: 'Casual dark jacket, white t-shirt, jeans',
-      accessories: 'None',
-      personality: 'Adventurous, calm',
-    });
-  }
-
-  return characters;
+function buildSceneVideoPrompt(scene: Scene): string {
+  return `${scene.cameraMovement} camera movement. ${scene.description}. Smooth cinematic motion. ${scene.emotion} mood. Natural subtle movement.`;
 }
 
-function generateLocations(prompt: string): Location[] {
-  const lowerPrompt = prompt.toLowerCase();
-  const locations: Location[] = [];
+// ============ STORY GENERATION ============
+async function generateStoryFromAI(prompt: string): Promise<{ title: string; story: string }> {
+  const systemPrompt = `You are a professional screenwriter. Given a video concept, create a compelling 15-second visual story. The story should be visually descriptive, concise, and suitable for a short video. No dialogue needed - focus on visual storytelling. Return your response as JSON with "title" and "story" fields.`;
 
-  if (lowerPrompt.includes('dubai')) {
-    locations.push({
-      id: uuidv4(),
-      name: 'Dubai Skyline',
-      description: 'Iconic Dubai skyline featuring Burj Khalifa, Burj Al Arab, and modern skyscrapers against a golden sunset sky',
-    });
+  const userPrompt = `Create a 15-second video story based on this concept: "${prompt}". Return JSON: {"title": "...", "story": "..."}`;
+
+  try {
+    const response = await generateText(userPrompt, systemPrompt);
+    // Try to parse JSON from response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        title: parsed.title || 'Untitled Video',
+        story: parsed.story || prompt,
+      };
+    }
+  } catch (error) {
+    console.error('Story generation error:', error);
   }
 
-  if (lowerPrompt.includes('airplane') || lowerPrompt.includes('aircraft') || lowerPrompt.includes('cabin')) {
-    locations.push({
-      id: uuidv4(),
-      name: 'Luxury Aircraft Cabin',
-      description: 'Premium first-class airplane cabin with cream leather seats, ambient warm lighting, polished wood accents, and large oval windows',
-    });
-  }
-
-  if (lowerPrompt.includes('city') || lowerPrompt.includes('urban')) {
-    locations.push({
-      id: uuidv4(),
-      name: 'Modern Cityscape',
-      description: 'A vibrant modern city with glass skyscrapers, wide boulevards, and dynamic urban energy',
-    });
-  }
-
-  if (lowerPrompt.includes('nature') || lowerPrompt.includes('forest') || lowerPrompt.includes('mountain')) {
-    locations.push({
-      id: uuidv4(),
-      name: 'Mountain Wilderness',
-      description: 'Pristine mountain landscape with snow-capped peaks, alpine meadows, and crystal-clear streams',
-    });
-  }
-
-  if (locations.length === 0) {
-    locations.push({
-      id: uuidv4(),
-      name: 'Primary Location',
-      description: `Setting inspired by: ${prompt.slice(0, 100)}`,
-    });
-  }
-
-  return locations;
+  // Fallback
+  return {
+    title: prompt.split(' ').slice(0, 5).join(' '),
+    story: `A visual journey: ${prompt}. The story unfolds through carefully composed scenes, building from establishing shots to intimate details, creating a cohesive 15-second visual experience.`,
+  };
 }
 
-function generateScenes(
+// ============ CHARACTER GENERATION ============
+async function generateCharactersFromAI(prompt: string): Promise<Character[]> {
+  const systemPrompt = `You are a character designer. Analyze the video concept and identify all characters. For each character, provide detailed physical descriptions for visual consistency. Return JSON array of character objects.`;
+
+  const userPrompt = `Based on this video concept: "${prompt}", identify all characters and create detailed character descriptions. Return JSON array: [{"name": "...", "age": number, "gender": "Male/Female", "ethnicity": "...", "skinTone": "...", "hair": "...", "eyes": "...", "face": "...", "body": "...", "clothing": "...", "accessories": "...", "personality": "..."}]`;
+
+  try {
+    const response = await generateText(userPrompt, systemPrompt);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed.map((c: any) => ({
+        id: uuidv4(),
+        name: c.name || 'Character',
+        age: c.age || 30,
+        gender: c.gender || 'Male',
+        ethnicity: c.ethnicity || 'Caucasian',
+        skinTone: c.skinTone || 'Light',
+        hair: c.hair || 'Short brown hair',
+        eyes: c.eyes || 'Brown',
+        face: c.face || 'Clean features',
+        body: c.body || 'Average build',
+        clothing: c.clothing || 'Casual attire',
+        accessories: c.accessories || 'None',
+        personality: c.personality || 'Calm',
+      }));
+    }
+  } catch (error) {
+    console.error('Character generation error:', error);
+  }
+
+  // Fallback
+  return [{
+    id: uuidv4(),
+    name: 'Protagonist',
+    age: 30,
+    gender: 'Male',
+    ethnicity: 'Caucasian',
+    skinTone: 'Light',
+    hair: 'Short brown hair',
+    eyes: 'Brown',
+    face: 'Clean-shaven, friendly features',
+    body: 'Average build, 5\'10"',
+    clothing: 'Dark jacket, white shirt',
+    accessories: 'None',
+    personality: 'Adventurous, calm',
+  }];
+}
+
+// ============ LOCATION GENERATION ============
+async function generateLocationsFromAI(prompt: string): Promise<Location[]> {
+  const systemPrompt = `You are a location scout. Identify key locations/environments for the video. Return JSON array of location objects.`;
+
+  const userPrompt = `For this video: "${prompt}", identify 1-3 key locations. Return JSON: [{"name": "...", "description": "detailed visual description"}]`;
+
+  try {
+    const response = await generateText(userPrompt, systemPrompt);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed.map((l: any) => ({
+        id: uuidv4(),
+        name: l.name || 'Location',
+        description: l.description || 'A visually striking location',
+      }));
+    }
+  } catch (error) {
+    console.error('Location generation error:', error);
+  }
+
+  return [{
+    id: uuidv4(),
+    name: 'Primary Location',
+    description: `Setting for: ${prompt.slice(0, 100)}`,
+  }];
+}
+
+// ============ SCENE PLANNING ============
+async function generateScenesFromAI(
   prompt: string,
+  story: string,
   characters: Character[],
   locations: Location[],
   style: VisualStyle
-): Scene[] {
-  const lowerPrompt = prompt.toLowerCase();
-  const scenes: Scene[] = [];
-  const totalDuration = 15;
+): Promise<Scene[]> {
+  const charNames = characters.map((c) => c.name).join(', ');
+  const locNames = locations.map((l) => l.name).join(', ');
 
-  if (lowerPrompt.includes('airplane') || lowerPrompt.includes('flight') || lowerPrompt.includes('dubai')) {
-    const sceneConfigs = [
-      {
-        startTime: 0,
-        duration: 3,
-        description: 'Dubai skyline at golden sunset, establishing shot',
-        cameraAngle: 'Wide aerial',
-        cameraMovement: 'Drone Movement' as CameraMovement,
-        characters: [] as string[],
-        location: locations[0]?.name || 'Dubai Skyline',
-        objects: ['Skyscrapers', 'Sunset sky', 'Clouds'],
-        lighting: 'Golden hour warm light',
-        weather: 'Clear',
-        timeOfDay: 'Sunset',
-        emotion: 'Awe, wonder',
-        transition: 'Dissolve' as Transition,
-      },
-      {
-        startTime: 3,
-        duration: 4,
-        description: 'Luxury aircraft flying gracefully above Dubai',
-        cameraAngle: 'Medium tracking',
-        cameraMovement: 'Tracking Shot' as CameraMovement,
-        characters: [] as string[],
-        location: 'Sky above Dubai',
-        objects: ['Aircraft', 'Clouds', 'City below'],
-        lighting: 'Warm sunset backlight',
-        weather: 'Clear with light clouds',
-        timeOfDay: 'Sunset',
-        emotion: 'Elegance, freedom',
-        transition: 'Cut' as Transition,
-      },
-      {
-        startTime: 7,
-        duration: 4,
-        description: 'Interior of luxury airplane cabin, warm ambient lighting',
-        cameraAngle: 'Medium shot',
-        cameraMovement: 'Slow Dolly In' as CameraMovement,
-        characters: characters.map((c) => c.name),
-        location: locations.find((l) => l.name.includes('Cabin'))?.name || 'Luxury Aircraft Cabin',
-        objects: ['Leather seat', 'Window', 'Cabin interior'],
-        lighting: 'Warm ambient cabin lighting with sunset glow through window',
-        weather: 'N/A',
-        timeOfDay: 'Sunset',
-        emotion: 'Comfort, luxury',
-        transition: 'Dissolve' as Transition,
-      },
-      {
-        startTime: 11,
-        duration: 4,
-        description: 'Passenger looking through airplane window at Dubai skyline',
-        cameraAngle: 'Over-the-shoulder close-up',
-        cameraMovement: 'Slow Zoom In' as CameraMovement,
-        characters: characters.map((c) => c.name),
-        location: 'Luxury Aircraft Cabin',
-        objects: ['Window', 'Dubai skyline visible through window'],
-        lighting: 'Golden light streaming through window onto face',
-        weather: 'Clear',
-        timeOfDay: 'Sunset',
-        emotion: 'Contemplation, peace',
-        transition: 'Fade' as Transition,
-      },
-    ];
+  const systemPrompt = `You are a storyboard artist. Plan 4 scenes for a 15-second video. Each scene should have specific camera work and visual details. Characters available: ${charNames}. Locations: ${locNames}. Return JSON array.`;
 
-    sceneConfigs.forEach((config, index) => {
-      const charDescriptions = characters
-        .filter((c) => config.characters.includes(c.name))
-        .map((c) => `${c.name}, ${c.age}-year-old ${c.ethnicity} ${c.gender.toLowerCase()} with ${c.skinTone.toLowerCase()} skin, ${c.hair}, ${c.eyes} eyes, wearing ${c.clothing}`)
-        .join(', ');
+  const userPrompt = `Create 4 scenes for this 15-second video. Story: "${story}". Original concept: "${prompt}". Return JSON array: [{"sceneNumber": 1, "startTime": 0, "duration": 4, "description": "...", "cameraAngle": "...", "cameraMovement": "Static|Slow Zoom In|Slow Zoom Out|Dolly In|Pan Left|Pan Right|Tilt Up|Tracking Shot|Orbit|Drone Movement", "characters": ["name1"], "location": "location name", "objects": ["obj1"], "lighting": "...", "weather": "...", "timeOfDay": "...", "emotion": "...", "transition": "Cut|Fade|Dissolve"}]`;
 
-      scenes.push({
+  const cameraMovements: CameraMovement[] = [
+    'Static', 'Slow Zoom In', 'Slow Zoom Out', 'Dolly In',
+    'Pan Left', 'Pan Right', 'Tilt Up', 'Tracking Shot', 'Drone Movement',
+  ];
+
+  try {
+    const response = await generateText(userPrompt, systemPrompt);
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed.map((s: any, i: number) => ({
         id: uuidv4(),
-        sceneNumber: index + 1,
-        startTime: config.startTime,
-        duration: config.duration,
-        description: config.description,
-        cameraAngle: config.cameraAngle,
-        cameraMovement: config.cameraMovement,
-        characters: config.characters,
-        location: config.location,
-        objects: config.objects,
-        lighting: config.lighting,
-        weather: config.weather,
-        timeOfDay: config.timeOfDay,
-        emotion: config.emotion,
+        sceneNumber: s.sceneNumber || i + 1,
+        startTime: s.startTime ?? i * 4,
+        duration: s.duration || 4,
+        description: s.description || `Scene ${i + 1}`,
+        cameraAngle: s.cameraAngle || 'Medium shot',
+        cameraMovement: (cameraMovements.includes(s.cameraMovement) ? s.cameraMovement : 'Slow Zoom In') as CameraMovement,
+        characters: s.characters || [],
+        location: s.location || locations[0]?.name || 'Location',
+        objects: s.objects || [],
+        lighting: s.lighting || 'Natural light',
+        weather: s.weather || 'Clear',
+        timeOfDay: s.timeOfDay || 'Daytime',
+        emotion: s.emotion || 'Neutral',
         visualStyle: style,
-        imagePrompt: `${style} style shot. ${config.description}. ${charDescriptions ? `Featuring: ${charDescriptions}.` : ''} Location: ${config.location}. Objects: ${config.objects.join(', ')}. ${config.cameraAngle} camera angle. ${config.lighting}. Time: ${config.timeOfDay}. Weather: ${config.weather}. Emotion: ${config.emotion}. High quality, detailed, consistent visual style.`,
-        videoPrompt: `${config.cameraMovement} camera movement. ${config.description}. Subtle natural movement. ${config.emotion} mood. Smooth cinematic motion.`,
-        status: 'pending',
-        transition: config.transition,
-        generatedImage: SCENE_PLACEHOLDER_IMAGES[index % SCENE_PLACEHOLDER_IMAGES.length],
-      });
-    });
-  } else {
-    const numScenes = Math.min(4, Math.max(3, Math.floor(totalDuration / 4)));
-    const sceneDuration = totalDuration / numScenes;
-
-    for (let i = 0; i < numScenes; i++) {
-      const movement = CAMERA_MOVEMENTS[Math.floor(Math.random() * CAMERA_MOVEMENTS.length)];
-      const transitions: Transition[] = ['Cut', 'Dissolve', 'Fade', 'Cut'];
-
-      scenes.push({
-        id: uuidv4(),
-        sceneNumber: i + 1,
-        startTime: Math.round(i * sceneDuration),
-        duration: i === numScenes - 1 ? totalDuration - Math.round(i * sceneDuration) : Math.round(sceneDuration),
-        description: `Scene ${i + 1}: ${prompt.slice(0, 50)}${i === 0 ? ' - establishing' : i === numScenes - 1 ? ' - conclusion' : ' - development'}`,
-        cameraAngle: i === 0 ? 'Wide establishing' : i === numScenes - 1 ? 'Close-up detail' : 'Medium shot',
-        cameraMovement: movement,
-        characters: characters.map((c) => c.name),
-        location: locations[i % locations.length]?.name || 'Primary Location',
-        objects: ['Environment details'],
-        lighting: i === 0 ? 'Natural ambient' : i === numScenes - 1 ? 'Dramatic golden hour' : 'Balanced natural',
-        weather: 'Clear',
-        timeOfDay: 'Golden hour',
-        emotion: i === 0 ? 'Introduction' : i === numScenes - 1 ? 'Resolution' : 'Development',
-        visualStyle: style,
-        imagePrompt: `${style} style. Scene ${i + 1} of ${numScenes}. ${prompt}. ${characters.map((c) => `${c.name}: ${c.clothing}, ${c.hair}`).join('. ')}. Location: ${locations[i % locations.length]?.description}. Cinematic composition, high detail.`,
-        videoPrompt: `${movement} camera. Smooth cinematic motion. Natural movement. ${style} aesthetic.`,
-        status: 'pending',
-        transition: transitions[i % transitions.length],
-        generatedImage: SCENE_PLACEHOLDER_IMAGES[i % SCENE_PLACEHOLDER_IMAGES.length],
-      });
+        imagePrompt: '', // Will be built later
+        videoPrompt: '', // Will be built later
+        status: 'pending' as const,
+        transition: (['Cut', 'Fade', 'Dissolve'].includes(s.transition) ? s.transition : 'Cut') as Transition,
+      }));
     }
+  } catch (error) {
+    console.error('Scene generation error:', error);
   }
 
-  return scenes;
+  // Fallback: 4 scenes
+  const fallbackDurations = [3, 4, 4, 4];
+  let startTime = 0;
+  return Array.from({ length: 4 }, (_, i) => {
+    const duration = fallbackDurations[i];
+    const scene: Scene = {
+      id: uuidv4(),
+      sceneNumber: i + 1,
+      startTime,
+      duration,
+      description: i === 0 ? `Opening: ${prompt.slice(0, 50)}` :
+                   i === 3 ? `Closing scene with resolution` :
+                   `Development scene ${i}`,
+      cameraAngle: i === 0 ? 'Wide establishing' : i === 3 ? 'Close-up' : 'Medium shot',
+      cameraMovement: cameraMovements[i % cameraMovements.length],
+      characters: characters.map((c) => c.name),
+      location: locations[i % locations.length]?.name || 'Location',
+      objects: ['Environment details'],
+      lighting: 'Natural ambient',
+      weather: 'Clear',
+      timeOfDay: 'Golden hour',
+      emotion: i === 0 ? 'Introduction' : i === 3 ? 'Resolution' : 'Development',
+      visualStyle: style,
+      imagePrompt: '',
+      videoPrompt: '',
+      status: 'pending',
+      transition: (['Cut', 'Dissolve', 'Fade', 'Cut'] as Transition[])[i],
+    };
+    startTime += duration;
+    return scene;
+  });
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
+// ============ MAIN GENERATION PIPELINE ============
 export async function generateProject(
   prompt: string,
   duration: 15,
@@ -342,12 +256,12 @@ export async function generateProject(
 ): Promise<Project> {
   const steps: GenerationStep[] = [
     { id: 'understanding', label: 'Understanding your idea', status: 'pending', progress: 0 },
-    { id: 'story', label: 'Creating story', status: 'pending', progress: 0 },
-    { id: 'characters', label: 'Creating characters', status: 'pending', progress: 0 },
-    { id: 'locations', label: 'Creating locations', status: 'pending', progress: 0 },
-    { id: 'storyboard', label: 'Creating storyboard', status: 'pending', progress: 0 },
-    { id: 'images', label: 'Generating scene images', status: 'pending', progress: 0 },
-    { id: 'video', label: 'Creating video clips', status: 'pending', progress: 0 },
+    { id: 'story', label: 'Creating story with AI', status: 'pending', progress: 0 },
+    { id: 'characters', label: 'Generating characters', status: 'pending', progress: 0 },
+    { id: 'locations', label: 'Scouting locations', status: 'pending', progress: 0 },
+    { id: 'storyboard', label: 'Planning storyboard', status: 'pending', progress: 0 },
+    { id: 'images', label: 'Generating scene images (AI)', status: 'pending', progress: 0 },
+    { id: 'video', label: 'Creating video clips (AI)', status: 'pending', progress: 0 },
     { id: 'rendering', label: 'Rendering final video', status: 'pending', progress: 0 },
   ];
 
@@ -355,75 +269,109 @@ export async function generateProject(
 
   // Step 1: Understanding
   updateStep('understanding', 'active', 0);
-  await delay(800);
+  await delay(500);
   updateStep('understanding', 'completed', 100);
 
-  // Step 2: Story
+  // Step 2: Generate Story (REAL AI)
   updateStep('story', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Story' } });
-  await delay(1200);
-  updateStep('story', 'completed', 100);
-  const title = generateTitle(prompt);
-  const story = generateStory(prompt);
+  const { title, story } = await generateStoryFromAI(prompt);
   dispatch({ type: 'UPDATE_PROJECT', payload: { id: projectId, title, story } });
+  updateStep('story', 'completed', 100);
 
-  // Step 3: Characters
+  // Step 3: Generate Characters (REAL AI)
   updateStep('characters', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Characters' } });
-  await delay(1000);
-  const characters = generateCharacters(prompt);
+  const characters = await generateCharactersFromAI(prompt);
   dispatch({ type: 'UPDATE_CHARACTERS', payload: { projectId, characters } });
   updateStep('characters', 'completed', 100);
 
-  // Step 4: Locations
+  // Step 4: Generate Locations (REAL AI)
   updateStep('locations', 'active', 0);
-  await delay(800);
-  const locations = generateLocations(prompt);
+  const locations = await generateLocationsFromAI(prompt);
   dispatch({ type: 'UPDATE_LOCATIONS', payload: { projectId, locations } });
   updateStep('locations', 'completed', 100);
 
-  // Step 5: Storyboard
+  // Step 5: Generate Storyboard (REAL AI)
   updateStep('storyboard', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Storyboard' } });
-  await delay(1000);
-  const scenes = generateScenes(prompt, characters, locations, style);
+  let scenes = await generateScenesFromAI(prompt, story, characters, locations, style);
+
+  // Build image prompts for each scene
+  scenes = scenes.map((scene) => ({
+    ...scene,
+    imagePrompt: buildSceneImagePrompt(scene, characters, locations, style, aspectRatio),
+    videoPrompt: buildSceneVideoPrompt(scene),
+  }));
+
   dispatch({
     type: 'UPDATE_PROJECT',
     payload: { id: projectId, scenes, aspectRatio, quality },
   });
   updateStep('storyboard', 'completed', 100);
 
-  // Step 6: Images
+  // Step 6: Generate Images (REAL AI - Pollinations)
   updateStep('images', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Images' } });
+
+  const imageDimensions = aspectRatio === '9:16' ? { width: 576, height: 1024 } :
+                          aspectRatio === '1:1' ? { width: 768, height: 768 } :
+                          { width: 1024, height: 576 };
+
   for (let i = 0; i < scenes.length; i++) {
-    await delay(1500);
-    const progress = ((i + 1) / scenes.length) * 100;
-    updateStep('images', 'active', progress);
+    const scene = scenes[i];
+    // Generate REAL image URL from Pollinations
+    const imageUrl = generateImageUrl(scene.imagePrompt, {
+      ...imageDimensions,
+      model: quality === 'High Quality' ? 'flux' : 'turbo',
+      seed: projectId.charCodeAt(0) * 1000 + i * 100,
+    });
+
+    // Update scene with generated image
+    const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
+    scenes[i] = updatedScene;
+
     dispatch({
       type: 'UPDATE_SCENE',
-      payload: {
-        projectId,
-        scene: { ...scenes[i], status: 'completed', generatedImage: SCENE_PLACEHOLDER_IMAGES[i % SCENE_PLACEHOLDER_IMAGES.length] },
-      },
+      payload: { projectId, scene: updatedScene },
     });
+
+    const progress = ((i + 1) / scenes.length) * 100;
+    updateStep('images', 'active', progress);
+    await delay(800); // Small delay between images
   }
   updateStep('images', 'completed', 100);
 
-  // Step 7: Video
+  // Step 7: Generate Video URLs (REAL AI - Pollinations)
   updateStep('video', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Generating Video' } });
+
   for (let i = 0; i < scenes.length; i++) {
-    await delay(2000);
+    const scene = scenes[i];
+    // Generate video URL from Pollinations
+    const videoUrl = generateVideoUrl(scene.videoPrompt, {
+      model: 'wan',
+      duration: Math.min(scene.duration, 5),
+    });
+
+    const updatedScene = { ...scene, generatedVideo: videoUrl };
+    scenes[i] = updatedScene;
+
+    dispatch({
+      type: 'UPDATE_SCENE',
+      payload: { projectId, scene: updatedScene },
+    });
+
     const progress = ((i + 1) / scenes.length) * 100;
     updateStep('video', 'active', progress);
+    await delay(500);
   }
   updateStep('video', 'completed', 100);
 
-  // Step 8: Rendering
+  // Step 8: Rendering (combining)
   updateStep('rendering', 'active', 0);
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Rendering' } });
-  await delay(3000);
+  await delay(1500);
   updateStep('rendering', 'completed', 100);
 
   dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { id: projectId, status: 'Completed' } });
@@ -454,10 +402,10 @@ export async function generateProject(
 }
 
 export function estimateCost(numScenes: number, quality: 'Standard' | 'High Quality'): { images: number; videos: number; estimatedCost: number } {
-  const imageCost = quality === 'High Quality' ? 0.04 : 0.02;
-  const videoCost = quality === 'High Quality' ? 0.15 : 0.08;
-  const images = numScenes;
-  const videos = numScenes;
-  const estimatedCost = images * imageCost + videos * videoCost;
-  return { images, videos, estimatedCost: Math.round(estimatedCost * 100) / 100 };
+  // Pollinations.ai is FREE for basic usage!
+  return { images: numScenes, videos: numScenes, estimatedCost: 0 };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

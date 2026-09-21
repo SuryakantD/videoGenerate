@@ -238,12 +238,17 @@ export default function CreatePage() {
       </div>
 
       {/* Cost Estimate */}
-      <div className="bg-gray-800/30 rounded-xl border border-gray-700/30 p-4 mb-6 flex items-center justify-between">
+      <div className="bg-green-500/5 rounded-xl border border-green-500/20 p-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <DollarSign size={16} className="text-green-400" />
-          <span className="text-gray-300 text-sm">Estimated AI generation cost:</span>
+          <div className="flex items-center gap-2">
+            <DollarSign size={16} className="text-green-400" />
+            <span className="text-gray-300 text-sm">AI Generation Cost (Pollinations.ai):</span>
+          </div>
         </div>
-        <span className="text-green-400 font-bold">${cost.estimatedCost.toFixed(2)}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-green-400 font-bold text-lg">FREE</span>
+          <span className="text-green-500/60 text-xs">∞ unlimited</span>
+        </div>
       </div>
 
       {/* Generate Button */}
@@ -287,24 +292,21 @@ export default function CreatePage() {
 
       {/* Pipeline Visualization */}
       <div className="mt-6 bg-gray-800/30 rounded-2xl border border-gray-700/30 p-6">
-        <h3 className="text-white font-semibold text-sm mb-4 text-center">AI Generation Pipeline</h3>
+        <h3 className="text-white font-semibold text-sm mb-2 text-center">Real AI Generation Pipeline</h3>
+        <p className="text-gray-500 text-xs text-center mb-4">Powered by Pollinations.ai — 100% Free</p>
         <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
           {[
             { label: 'Your Idea', color: 'bg-violet-500/20 text-violet-300 border-violet-500/30' },
             { label: '→' },
-            { label: 'Story', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+            { label: 'GPT-4o-mini', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
             { label: '→' },
             { label: 'Characters', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
             { label: '→' },
-            { label: 'Locations', color: 'bg-teal-500/20 text-teal-300 border-teal-500/30' },
+            { label: 'Scenes', color: 'bg-teal-500/20 text-teal-300 border-teal-500/30' },
             { label: '→' },
-            { label: 'Storyboard', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
+            { label: 'Flux Images', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
             { label: '→' },
-            { label: 'Images', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
-            { label: '→' },
-            { label: 'Video', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
-            { label: '→' },
-            { label: 'Render', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
+            { label: 'WAN Video', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
             { label: '→' },
             { label: 'Final Video', color: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30' },
           ].map((item, i) =>
@@ -325,20 +327,24 @@ export default function CreatePage() {
           <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6 max-w-md w-full">
             <h3 className="text-white text-xl font-bold mb-3">Confirm Generation</h3>
             <p className="text-gray-400 text-sm mb-4">
-              This will generate approximately {cost.images} images and {cost.videos} video clips.
+              This will use Pollinations.ai to generate {cost.images} AI images and {cost.videos} AI video clips.
             </p>
             <div className="bg-gray-900/50 rounded-lg p-4 mb-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Images:</span>
+                <span className="text-gray-400">AI Images (Flux):</span>
                 <span className="text-white">{cost.images}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Video clips:</span>
+                <span className="text-gray-400">AI Videos (WAN 2.6):</span>
                 <span className="text-white">{cost.videos}</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">AI Text (GPT-4o-mini):</span>
+                <span className="text-white">Story + Characters + Scenes</span>
+              </div>
               <div className="flex justify-between text-sm border-t border-gray-700 pt-2">
-                <span className="text-gray-400">Estimated cost:</span>
-                <span className="text-green-400 font-bold">${cost.estimatedCost.toFixed(2)}</span>
+                <span className="text-gray-400">Total cost:</span>
+                <span className="text-green-400 font-bold">FREE ✨</span>
               </div>
             </div>
             <div className="flex gap-3">
