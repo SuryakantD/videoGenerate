@@ -149,49 +149,84 @@ export async function generateVideoFromImages(
         reject(new Error('MediaRecorder error'));
       };
 
-      // Load images directly from URLs (no fetch/conversion needed!)
+      // Load images directly from URLs with retry logic
       console.log('[VideoGen] Loading images...');
       const images: HTMLImageElement[] = [];
       
       for (let i = 0; i < imageUrls.length; i++) {
-        try {
-          console.log(`[VideoGen] Loading image ${i + 1}/${imageUrls.length}: ${imageUrls[i].substring(0, 60)}...`);
-          
-          // Load image directly from URL (Pollinations URLs work directly!)
-          const img = new Image();
-          img.crossOrigin = 'anonymous'; // Enable CORS for canvas
-          
-          await new Promise<void>((resolveImg, rejectImg) => {
-            img.onload = () => {
-              console.log(`[VideoGen] Image ${i + 1} loaded successfully`);
-              resolveImg();
-            };
-            img.onerror = (e) => {
-              console.error(`[VideoGen] Failed to load image ${i + 1}:`, e);
-              rejectImg(new Error(`Failed to load image ${i + 1}`));
-            };
-            img.src = imageUrls[i];
-          });
-          
-          images.push(img);
-          
-          if (onProgress) {
-            onProgress(((i + 1) / imageUrls.length) * 30); // 0-30% for loading
+        let loadAttempts = 0;
+        const maxAttempts = 3;
+        let loaded = false;
+        
+        while (loadAttempts < maxAttempts && !loaded) {
+          try {
+            console.log(`[VideoGen] Loading image ${i + 1}/${imageUrls.length} (attempt ${loadAttempts + 1}/${maxAttempts})`);
+            
+            // Load image directly from URL
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            await new Promise<void>((resolveImg, rejectImg) => {
+              const timeout = setTimeout(() => {
+                rejectImg(new Error(`Image ${i + 1} load timeout`));
+              }, 15000); // 15 second timeout
+              
+              img.onload = () => {
+                clearTimeout(timeout);
+                console.log(`[VideoGen] Image ${i + 1} loaded successfully`);
+                resolveImg();
+              };
+              
+              img.onerror = (e) => {
+                clearTimeout(timeout);
+                rejectImg(new Error(`Failed to load image ${i + 1}`));
+              };
+              
+              img.src = imageUrls[i];
+            });
+            
+            images.push(img);
+            loaded = true;
+            
+            if (onProgress) {
+              onProgress(((i + 1) / imageUrls.length) * 30);
+            }
+          } catch (error) {
+            loadAttempts++;
+            console.error(`[VideoGen] Failed to load image ${i + 1} (attempt ${loadAttempts}/${maxAttempts}):`, error);
+            
+            if (loadAttempts < maxAttempts) {
+              console.log(`[VideoGen] Retrying image ${i + 1} in 2 seconds...`);
+              await new Promise(r => setTimeout(r, 2000));
+            }
           }
-        } catch (error) {
-          console.error(`[VideoGen] Failed to load image ${i + 1}:`, error);
-          // Create a placeholder image
+        }
+        
+        // If all attempts failed, use a placeholder
+        if (!loaded) {
+          console.error(`[VideoGen] All attempts failed for image ${i + 1}, using placeholder`);
           const placeholder = document.createElement('canvas');
           placeholder.width = width;
           placeholder.height = height;
           const pCtx = placeholder.getContext('2d');
           if (pCtx) {
-            pCtx.fillStyle = '#1a1a1a';
+            // Create a gradient background
+            const gradient = pCtx.createLinearGradient(0, 0, width, height);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            pCtx.fillStyle = gradient;
             pCtx.fillRect(0, 0, width, height);
+            
+            // Add text
             pCtx.fillStyle = '#ffffff';
-            pCtx.font = '30px Arial';
+            pCtx.font = 'bold 40px Arial';
             pCtx.textAlign = 'center';
-            pCtx.fillText(`Scene ${i + 1}`, width / 2, height / 2);
+            pCtx.textBaseline = 'middle';
+            pCtx.fillText(`Scene ${i + 1}`, width / 2, height / 2 - 20);
+            
+            pCtx.font = '20px Arial';
+            pCtx.fillStyle = '#aaaaaa';
+            pCtx.fillText('(Image generation failed)', width / 2, height / 2 + 30);
           }
           const placeholderImg = new Image();
           placeholderImg.src = placeholder.toDataURL();
@@ -199,13 +234,18 @@ export async function generateVideoFromImages(
         }
       }
 
-      console.log('[VideoGen] All images loaded, starting recording...');
+      console.log(`[VideoGen] All ${images.length} images loaded, starting recording...`);
 
       // Start recording
+      console.log('[VideoGen] Starting MediaRecorder...');
       mediaRecorder.start();
+      console.log('[VideoGen] MediaRecorder started, state:', mediaRecorder.state);
       
       const totalDuration = images.length * durationPerImage * 1000;
       const startTime = Date.now();
+      let lastSceneIndex = -1;
+      
+      console.log(`[VideoGen] Total duration: ${totalDuration}ms, ${images.length} scenes, ${durationPerImage}s each`);
       
       const animate = () => {
         const elapsed = Date.now() - startTime;
@@ -220,6 +260,12 @@ export async function generateVideoFromImages(
           Math.floor(elapsed / (durationPerImage * 1000)),
           images.length - 1
         );
+        
+        // Log scene changes
+        if (sceneIndex !== lastSceneIndex) {
+          console.log(`[VideoGen] Scene ${sceneIndex + 1} started at ${elapsed}ms`);
+          lastSceneIndex = sceneIndex;
+        }
         
         const sceneProgress = (elapsed % (durationPerImage * 1000)) / (durationPerImage * 1000);
         
@@ -240,6 +286,8 @@ export async function generateVideoFromImages(
           ctx.save();
           ctx.drawImage(img, offsetX, offsetY, imgWidth, imgHeight);
           ctx.restore();
+        } else {
+          console.warn(`[VideoGen] Image ${sceneIndex} is undefined!`);
         }
 
         // Transition effect (fade in/out)
@@ -268,6 +316,34 @@ export async function generateVideoFromImages(
       console.error('[VideoGen] Error:', error);
       reject(error);
     }
+  });
+}
+
+// ============ IMAGE VALIDATION ============
+// Validates that an image URL is accessible and returns a valid image
+export async function validateImageUrl(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    const timeout = setTimeout(() => {
+      console.warn('[Pollinations] Image validation timeout');
+      resolve(false);
+    }, 10000); // 10 second timeout
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      console.log('[Pollinations] Image validation successful:', url.substring(0, 50) + '...');
+      resolve(true);
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      console.error('[Pollinations] Image validation failed:', url.substring(0, 50) + '...');
+      resolve(false);
+    };
+    
+    img.src = url;
   });
 }
 

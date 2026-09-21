@@ -13,6 +13,7 @@ import {
   generateText,
   generateImageUrl,
   generateVideoFromImages,
+  validateImageUrl,
 } from '../services/pollinations';
 
 // ============ PROMPT ENGINE ============
@@ -326,13 +327,14 @@ export async function generateProject(
 
   console.log('[GenerationEngine] Starting image generation for', scenes.length, 'scenes');
 
+  // Generate all image URLs first
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     
     console.log(`[GenerationEngine] Generating image for Scene ${i + 1}:`, scene.description);
     
     try {
-      // Generate REAL image URL from Pollinations (no fetch needed - URLs work directly!)
+      // Generate REAL image URL from Pollinations
       const imageUrl = generateImageUrl(scene.imagePrompt, {
         ...imageDimensions,
         seed: projectId.charCodeAt(0) * 1000 + i * 100,
@@ -340,19 +342,40 @@ export async function generateProject(
 
       console.log(`[GenerationEngine] Scene ${i + 1} image URL:`, imageUrl.substring(0, 80) + '...');
 
-      // Update scene with generated image URL (use URL directly, no blob conversion!)
-      const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
-      scenes[i] = updatedScene;
+      // Validate the image URL by attempting to load it
+      console.log(`[GenerationEngine] Validating Scene ${i + 1} image...`);
+      const isValid = await validateImageUrl(imageUrl);
+      
+      if (isValid) {
+        console.log(`[GenerationEngine] Scene ${i + 1} image validated successfully`);
+        const updatedScene = { ...scene, generatedImage: imageUrl, status: 'completed' as const };
+        scenes[i] = updatedScene;
+      } else {
+        console.warn(`[GenerationEngine] Scene ${i + 1} image validation failed, retrying with different seed...`);
+        // Retry with different seed
+        const retryUrl = generateImageUrl(scene.imagePrompt, {
+          ...imageDimensions,
+          seed: projectId.charCodeAt(0) * 1000 + i * 100 + 999,
+        });
+        const retryValid = await validateImageUrl(retryUrl);
+        
+        if (retryValid) {
+          console.log(`[GenerationEngine] Scene ${i + 1} retry successful`);
+          const updatedScene = { ...scene, generatedImage: retryUrl, status: 'completed' as const };
+          scenes[i] = updatedScene;
+        } else {
+          throw new Error('Image validation failed after retry');
+        }
+      }
 
       dispatch({
         type: 'UPDATE_SCENE',
-        payload: { projectId, scene: updatedScene },
+        payload: { projectId, scene: scenes[i] },
       });
       
-      console.log(`[GenerationEngine] Scene ${i + 1} image generated successfully`);
+      console.log(`[GenerationEngine] Scene ${i + 1} completed`);
     } catch (error) {
       console.error(`[GenerationEngine] Image generation failed for scene ${i + 1}:`, error);
-      // Mark as failed but continue
       const updatedScene = { ...scene, status: 'failed' as const };
       scenes[i] = updatedScene;
       dispatch({
@@ -363,11 +386,32 @@ export async function generateProject(
 
     const progress = ((i + 1) / scenes.length) * 100;
     updateStep('images', 'active', progress);
-    await delay(800); // Small delay between images
+    await delay(1000); // Longer delay to avoid rate limiting
   }
   
-  console.log('[GenerationEngine] Image generation complete. Successful scenes:', 
-    scenes.filter(s => s.status === 'completed').length, '/', scenes.length);
+  const successfulCount = scenes.filter(s => s.status === 'completed').length;
+  console.log('[GenerationEngine] Image generation complete. Successful scenes:', successfulCount, '/', scenes.length);
+  
+  // Ensure we have at least 3 successful scenes for video generation
+  if (successfulCount < 3) {
+    console.error('[GenerationEngine] Too few successful scenes for video generation!');
+    // Generate fallback images for failed scenes
+    for (let i = 0; i < scenes.length; i++) {
+      if (scenes[i].status === 'failed') {
+        console.log(`[GenerationEngine] Generating fallback image for Scene ${i + 1}...`);
+        const fallbackUrl = generateImageUrl(scenes[i].description, {
+          ...imageDimensions,
+          seed: Date.now() + i,
+        });
+        scenes[i] = { ...scenes[i], generatedImage: fallbackUrl, status: 'completed' as const };
+        dispatch({
+          type: 'UPDATE_SCENE',
+          payload: { projectId, scene: scenes[i] },
+        });
+        await delay(1000);
+      }
+    }
+  }
   
   updateStep('images', 'completed', 100);
 
