@@ -1,17 +1,33 @@
 // Pollinations API Service
 
-export function generateImageUrl(
+export async function generateAndLoadImage(
   prompt: string,
   options: {
     width?: number;
     height?: number;
     seed?: number;
   } = {}
-): string {
+): Promise<string> {
   const { width = 1024, height = 576, seed = Date.now() } = options;
   const encodedPrompt = encodeURIComponent(prompt);
   
-  return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+  
+  // Fetch the image and convert to blob URL to avoid CORS issues
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    
+    return blobUrl;
+  } catch (error) {
+    console.error('Error loading image:', error);
+    throw error;
+  }
 }
 
 export async function generateVideoFromImages(
@@ -79,7 +95,6 @@ export async function generateVideoFromImages(
       }
 
       const img = new Image();
-      img.crossOrigin = 'anonymous';
       
       img.onload = () => {
         images[index] = img;

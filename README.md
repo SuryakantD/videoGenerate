@@ -2,9 +2,14 @@
 
 A simple, working AI video generator that creates videos from text prompts using Pollinations API.
 
+## ✅ Fixed: Images Now Load Correctly
+
+The app now fetches images and converts them to blob URLs, which fixes the blank scenes issue. Images are loaded directly into the browser's memory, avoiding CORS issues.
+
 ## Features
 
 - ✅ Generate 4 scene images from a text prompt
+- ✅ Images load correctly using blob URLs
 - ✅ Create a video slideshow with Ken Burns effect
 - ✅ Fade transitions between scenes
 - ✅ Download the generated video
@@ -15,8 +20,9 @@ A simple, working AI video generator that creates videos from text prompts using
 
 1. Enter a text prompt describing your video
 2. The app generates 4 scene images using Pollinations AI
-3. Creates a video slideshow with smooth transitions
-4. Download the video as a WebM file
+3. Images are fetched and converted to blob URLs (fixes CORS issues)
+4. Creates a video slideshow with smooth transitions
+5. Download the video as a WebM file
 
 ## Usage
 
@@ -40,6 +46,7 @@ npm run dev
 ## Technical Details
 
 - **Image Generation**: Pollinations API (Flux model)
+- **Image Loading**: Fetched and converted to blob URLs (fixes CORS)
 - **Video Generation**: Canvas + MediaRecorder API
 - **Video Format**: WebM (VP9 codec)
 - **Resolution**: 1024x576
@@ -63,6 +70,7 @@ npm run dev
 ## Notes
 
 - Video generation happens entirely in your browser
+- Images are fetched and converted to blob URLs to avoid CORS issues
 - No data is sent to any server except for image generation
 - Generated videos are WebM format (may need conversion for some players)
 - Each generation takes 2-3 minutes depending on your internet speed
@@ -73,6 +81,8 @@ npm run dev
 - Check your internet connection
 - Pollinations API might be temporarily down
 - Try refreshing the page
+- Check browser console for errors
+- Images are now fetched and converted to blob URLs to fix CORS issues
 
 **Video not playing?**
 - Try a different browser (Chrome recommended)

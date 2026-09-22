@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { generateImageUrl, generateVideoFromImages } from './services/api';
+import { generateAndLoadImage, generateVideoFromImages } from './services/api';
 
 interface Scene {
   id: number;
@@ -39,7 +39,7 @@ export default function App() {
       // Generate images for each scene
       for (let i = 0; i < 4; i++) {
         setStatus(`Generating scene ${i + 1} of 4...`);
-        const imageUrl = generateImageUrl(sceneDescriptions[i], {
+        const imageUrl = await generateAndLoadImage(sceneDescriptions[i], {
           width: 1024,
           height: 576,
           seed: Date.now() + i
@@ -66,7 +66,7 @@ export default function App() {
         transitionDuration: 0.5,
         width: 1024,
         height: 576,
-        onProgress: (progress) => {
+        onProgress: (progress: number) => {
           setStatus(`Creating video... ${Math.round(progress)}%`);
         }
       });
